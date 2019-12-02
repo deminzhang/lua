@@ -1,0 +1,61 @@
+
+luajit
+	src/msvcbuild.bat static
+zlib-1.2.11
+	nmake -f win32/Makefile.msc
+--todo-------------------------------------------------
+db 缓存
+MMDB内存数据库
+	redis 效率A,有事物,不支持回滚
+	sqlite3(':memory:') 效率B,事物回滚,不需连库,无法共享
+	mysql ENGINE=MEMORY 效率C,事物回滚,多连接共享,字段要求定长
+	memdb lua应用层自实现,结果集不用转换直接使用
+	pgsql 竟然没有
+net
+	UDP/mime
+	远程连接所经网卡mac
+	luahttp优化
+c版event...
+多线程共公静态变量处理
+callin/callout/RPC自由参数
+_encodebuf(buffer,data,...)
+_decodebuf(buffer)
+_encodelen(length)
+c/s 寻路算法
+c lbs接入(高德orOther
+c 语音转文字
+
+
+--ing--------------------------------------------------
+--server
+net逻辑监听分布
+net检查接收buff?
+
+--luaU3D
+GUIMgr
+login
+level1
+
+--done-------------------------------------------------
+U3D插件
+c版_callout
+_callout lua版
+luazip/zlib
+sqlite3 stmt prepare
+sqlite3
+time2date/date2time
+短函数优化为inline
+net ipv6
+os.launch/kill/..
+使用-std=c99 inline for(int
+sql statement缓存
+codec ref
+c版_queue
+mysql后续/outline
+netshare
+_encode/_decode 无ref版
+luajson
+pgsql-timestamp用日期串读写
+_time
+luahttp
+

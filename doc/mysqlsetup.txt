@@ -1,0 +1,98 @@
+ Linux安装64位Mysql5.7.22
+
+以安装在/usr/local目录下为例
+
+1.下载安装包地址：https://dev.mysql.com/downloads/file/?id=476936，安装包保存到/usr/local
+
+2.解压：
+
+cd /usr/local
+
+tar -zxvf mysql-5.7.22-linux-glibc2.12-x86_64.tar
+
+mv mysql-5.7.22-linux-glibc2.12-x86_64 mysql-5.7.22
+
+ln -s mysql-5.7.22 mysql
+
+3.添加用户组和用户
+
+#添加用户组
+groupadd mysql
+#添加用户mysql 到用户组mysql
+useradd -g mysql mysql
+
+4.安装
+
+cd /usr/local/mysql
+
+mkdir data
+
+chown -R mysql:mysql ./
+
+./bin/mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data
+
+#将mysql/目录下除了data/目录的所有文件，改回root用户所有
+chown -R root .
+#mysql用户只需作为mysql-5.7.22/data/目录下所有文件的所有者
+chown -R mysql data
+
+5.复制启动文件
+
+cp support-files/mysql.server /etc/init.d/mysqld
+
+chmod 755 /etc/init.d/mysqld
+
+cp bin/my_print_defaults /usr/bin/ 
+
+6.修改启动脚本
+
+vi /etc/init.d/mysqld
+#修改项：
+basedir=/usr/local/mysql-5.7.22/
+datadir=/usr/local/mysql-5.7.22/data
+port=3306
+
+#加入环境变量，编辑 /etc/profile，这样可以在任何地方用mysql命令了
+vi /etc/profile
+#添加mysql路径，加入下面内容，按ESC-->:wq保存
+export PATH=$PATH:/usr/local/mysql-5.7.22/bin
+#刷新立即生效
+source /etc/profile
+
+7.修改mysql配置项
+
+vi /etc/my.cnf
+
+配置如下：
+
+[mysqld]
+basedir = /usr/local/mysql-5.7.22
+datadir = /usr/local/mysql-5.7.22/data
+socket = /tmp/mysql.sock
+user = mysql
+tmpdir = /tmp
+symbolic-links=0
+
+[mysqld_safe]
+
+log-error = /usr/local/mysql-5.7.22/data/error.log
+pid-file = /usr/local/mysql-5.7.22/data/mysql.pid
+!includedir /etc/my.cnf.d
+
+ 8.启动mysql
+
+service mysqld start
+
+如启动失败，删除 /usr/local/mysql-5.7.22/data下所有文件，重新执行./bin/mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data，再启动
+
+9.进入mysql修改初始密码，修改远程连接的用户权限问题
+
+mysql -uroot -p
+
+ALTER USER USER() IDENTIFIED BY '123';  OR  set password=password("123");
+
+use mysql;
+
+update user set host = '%' where user ='root';
+
+flush privileges;

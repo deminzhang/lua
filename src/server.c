@@ -130,7 +130,8 @@ static int lua_launch(lua_State *L)
 	CloseHandle(pid.hThread);
 	lua_pushinteger(L, pid.dwProcessId);
 	return 1;
-#else //TODO 未完全看明白
+#else
+	//与主进程通信
 	if (lua_objlen(L, 1) > 255)
 		lua_errorEx(L, "directory too long");
 	//发送参数给子进程

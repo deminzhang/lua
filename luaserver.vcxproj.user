@@ -11,11 +11,11 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LocalDebuggerEnvironment>x64</LocalDebuggerEnvironment>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>..\lserver</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>.\scripts</LocalDebuggerWorkingDirectory>
     <LocalDebuggerCommandArguments>type=gs gstype=world line=1 token=1</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>..\lserver</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>.\scripts</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup>

@@ -1,6 +1,9 @@
 # dev
 
+已删除x86属配
+
 require list of libs for windows
+	可安装PostgreSQL,MySQL复制相应
 	
 	.\lib\
 	libmysql.lib	C:\Program Files\MySQL\MySQL Connector.C 6.1\lib\
@@ -18,4 +21,26 @@ require list of libs for windows
 	libmysql.dll	C:\Program Files\MySQL\MySQL Connector.C 6.1\lib
 
 
-可安装PostgreSQL,MySQL复制相应
+luajit source add
+	lua.h
+	LUA_API void  (lua_sizetable) (lua_State *L, int idx); //Extra
+	LUA_API void  (lua_duplicatetable) (lua_State *L, int idx); //Extra
+
+	lj_api.c
+	LUA_API void lua_sizetable(lua_State *L, int idx)
+	{
+	  GCtab *t;
+	  t = tabV(index2adr(L, idx));
+	  lua_pushnumber(L,t->asize);
+	  lua_pushnumber(L,t->hmask);
+	}
+
+	LUA_API void lua_duplicatetable(lua_State *L, int idx)
+	{
+	  GCtab *t;
+	  lj_gc_check(L);
+	  t = lj_tab_dup(L, tabV(index2adr(L, idx)));
+	  settabV(L, L->top, t);
+	  incr_top(L);
+	}
+

@@ -555,11 +555,12 @@ static void net_selecting(lua_State *L)
 		if (net->state != NETCLOSE)	{
 			switch (net->state)	{
 			case NETRECV:
-				if (FD_ISSET(sock, rp))
-					if(net->seps[0])
+				if (FD_ISSET(sock, rp)) {
+					if (net->seps[0])
 						net_receiveSep(L, net);
 					else
 						net_receive(L, net);
+				}
 				//if (FD_ISSET(sock, wp)) //?
 				//	fprintf(stderr, "NETRECV wp\n");
 				break;
@@ -661,8 +662,8 @@ static int luanet_setReceive(lua_State *L) //receive(net, sep4..., len, onReceiv
 	struct epoll_event e = { EPOLLIN | EPOLLRDHUP, net };
 	epoll_ctl(epoll_fd, EPOLL_CTL_MOD, net->sock, &e);
 #endif
-	for (i = 0; i<4; i++)
-		if (net->seps[i] != seps[i])
+	for (i = 0; i < 4; i++) {
+		if (net->seps[i] != seps[i]) {
 			if (net->seps[i]) { //old
 				lua_unref(L, net->sepsref[i]);
 				net->sepsref[i] = 0;
@@ -673,14 +674,15 @@ static int luanet_setReceive(lua_State *L) //receive(net, sep4..., len, onReceiv
 				}
 				else
 					net->seps[i] = NULL;
-			}
-			else
-				if (seps[i]){
+			} else {
+				if (seps[i]) {
 					net->seps[i] = seps[i];
 					lua_pushvalue(L, i + 2);
 					net->sepsref[i] = lua_ref(L, -1);
 				}
-
+			}
+		}
+	}
 	net->len = len;
 	net->timeout = time(NULL) + Range(tm, 1, 86400);
 	net->decode = tostr;
@@ -779,10 +781,8 @@ static int luanet_sendBinary(lua_State *L) //ing
 	int i;
 	int p = 0;
 	char last = '\0';
-	for (i = 0; i < len; i++)
-	{
-		switch (s[i])
-		{
+	for (i = 0; i < len; i++) {
+		switch (s[i]) {
 		case 'b'://byte
 			*(char*)(buff + p) = (char)lua_tointeger(L, i + 3);
 			p += sizeof(char);

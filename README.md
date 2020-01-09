@@ -1,8 +1,8 @@
 # dev
 
-已删除x86属配
+1.已删除x86属配,只保留x64版本
 
-require list of libs for windows
+2.require list of libs for windows
 	可安装PostgreSQL,MySQL复制相应
 	
 	.\lib\
@@ -20,13 +20,21 @@ require list of libs for windows
 	ssleay32.dll	C:\Program Files\PostgreSQL\9.6\bin
 	libmysql.dll	C:\Program Files\MySQL\MySQL Connector.C 6.1\lib
 
+3.headFiles 
+	lauxlib.h   lua.h    luaconf.h  lualib.h   lua.hpp  luajit.h ->luajit2
+	sqlite3.h   sqlite3.c
+	zconf.h zlib.h
+	mysql/**			-> C:\Program Files\MySQL\MySQL Connector.C 6.1\include
+	libpq-fe.h  pg_config_ext.h  postgres_ext.h	-> C:\Program Files\PostgreSQL\9.6\include
 
-luajit source add
-	lua.h
+4.luajit source add
+
+	lua.h:
+
 	LUA_API void  (lua_sizetable) (lua_State *L, int idx); //Extra
 	LUA_API void  (lua_duplicatetable) (lua_State *L, int idx); //Extra
 
-	lj_api.c
+	lj_api.c:
 	LUA_API void lua_sizetable(lua_State *L, int idx)
 	{
 	  GCtab *t;

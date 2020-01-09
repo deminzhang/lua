@@ -377,14 +377,14 @@ int main(int argc, char *argv[], char *envs[])
 	if (ret == 0)
 		for (;;) {
 			set__now(); //business time
-			luanet_loop(L); //head
-			luanet_loop(L); //body
+			for (int i = 0; i < 16; ++i) {
+				luanet_loop(L); //head
+				luanet_loop(L); //body
+			}
 			luaqueue_loop(L); //timers
-
-			lua_getglobal(L, "_mainloop"); //temp main loop
-			if (lua_isfunction(L, -1))
-				if (lua_pcall(L, 0, 0, 0) != 0) 
-					fprintf(stderr, "%s\n", lua_tostring(L, -1));
+			lua_getglobal(L, "_mainloop"); //main loop in lua
+			if (lua_isfunction(L, -1)&&lua_pcall(L, 0, 0, 0) != 0) 
+				fprintf(stderr, "%s\n", lua_tostring(L, -1));
 
 			lua_settop(L, 0); //keepsafe
 			usleep(0);

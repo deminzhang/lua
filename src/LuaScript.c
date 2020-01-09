@@ -65,8 +65,7 @@ static int table_weakk(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(2));
 		lua_pushvalue(L, lua_upvalueindex(3));
 		lua_rawset(L, -3);
-	}
-	else
+	} else
 		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKK");
 	lua_setmetatable(L, -2);
 	return 1;
@@ -81,8 +80,7 @@ static int table_weakv(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(2));
 		lua_pushvalue(L, lua_upvalueindex(3));
 		lua_rawset(L, -3);
-	}
-	else
+	} else
 		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKV");
 	lua_setmetatable(L, -2);
 	return 1;
@@ -97,8 +95,7 @@ static int table_weakkv(lua_State *L) {
 		lua_pushvalue(L, lua_upvalueindex(2));
 		lua_pushvalue(L, lua_upvalueindex(3));
 		lua_rawset(L, -3);
-	}
-	else
+	} else
 		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKKV");
 	lua_setmetatable(L, -2);
 	return 1;
@@ -235,8 +232,7 @@ static int lua_bytesLen(lua_State*L)
 
 static int lua_bytes2str(lua_State*L)
 {
-	if (lua_isstring(L, 1))
-		return 1;
+	if (lua_isstring(L, 1)) return 1;
 	size_t len; unsigned char *s = (unsigned char*)lua_toBytes(L, 1, &len);
 	size_t i = indexn0(luaL_optint(L, 2, 1), len);
 	size_t j = indexn(luaL_optint(L, 3, -1), len);

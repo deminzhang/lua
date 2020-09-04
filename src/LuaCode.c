@@ -1,43 +1,44 @@
 #include "LuaCode.h"
 
-#define C_NIL 0
-#define C_TRUE 1
-#define C_FALSE 2
-#define C_INT1 3
-#define C_INT2 4
-#define C_INT4 5
-#define C_INT8 6
-#define C_FLOAT4 7
-#define C_FLOAT8 8
-#define C_STR1 9 //string len<256
-#define C_STR2 0xa //string len=short
-#define C_STR4 0xb //string len=int   no len=int8 if MAXSTRLEN<0xffff no use
-#define C_TABLE 0xc //table start
-#define C_REF 0xd	//refer a table or string>STRREFLEN
-#define C_ENCODED 0xe	//encoded
-#define C_END 0xf  //end of table or all
 
-#define MAXCODELEN 0xfff0 //max len of code buffer
-#define MAXSTRLEN 0x4000 //max len of string
-#define STRREFLEN 5 //string can set ref min len
-#define REF_LEN_TYPE unsigned //unsigned short maybe enough
+#define C_NIL 0			//
+#define C_TRUE 1		//t
+#define C_FALSE 2		//f
+#define C_INT1 3		//b byte
+#define C_INT2 4		//w short byte16
+#define C_INT4 5		//i int	byte32
+#define C_INT8 6		//l long byte64
+#define C_FLOAT4 7		//f float
+#define C_FLOAT8 8		//d double
+#define C_STR1 9		//s string len<256
+#define C_STR2 0xa		//S string len==byte16
+#define C_STR4 0xb		//M string len==byte32   no len=int8 if MAXSTRLEN<0xffff no use
+#define C_TABLE 0xc		//table start
+#define C_REF 0xd		//refer a table or string>STRREFLEN
+#define C_ENCODED 0xe	//encoded
+#define C_END 0xf		//end of table or all
+
+#define MAX_CODE_LEN 0xfff0		//max len of code buffer 最大编码长度
+#define MAX_STR_LEN 0x4000		//max len of string 最大支持字串长度
+#define STR_REF_LEN 5			//string can set ref min len 小于该长度字串不作重复引用记录
+#define REF_LEN_TYPE unsigned	//unsigned short maybe enough 引用长度记录长度
+#define USE_REF_TAB_AND_LONGSTR //refer table and longstring  是否引用压缩重复表和长字串
 //#define LENONHEAD //len on head of bytes. must use with LuaNet together
-#define USE_REF_TAB_AND_LONGSTR //refer table and longstring 
 
 //0xkTYPEvTYPE,k,v
-//true=C_TRUE 1
-//false=C_FALSE 1
-//double =C_FLOAT8,double 9
+//true = C_TRUE 1
+//false = C_FALSE 1
+//double = C_FLOAT8,double 9
 //char = C_INT1,char 2
 //short = C_INT2,short 3
 //int = C_INT4,int 5
-//int8 =C_INT8,int8 9
+//int8 = C_INT8,int8 9
 //0xkkkkvvvv,k,v
-//double=C_FLOAT8,d8
-//str1=charlen,str
-//str2=shortlen,str
-//str4=intlen,str
-//ref=idx
+//double = C_FLOAT8,d8
+//str1 = charlen,str
+//str2 = shortlen,str
+//str4 = intlen,str
+//ref = idx
 //refencode[pointer]=idx
 //refdecode[idx]=value
 
@@ -115,11 +116,11 @@ static unsigned char encode_str(lua_State *L, int idx, int *p, char *buff, int r
 	size_t len;
 	int isString = lua_isstring(L, idx);
 	const char *s = lua_toBytes(L, idx, &len);
-	if (len > MAXSTRLEN)
+	if (len > MAX_STR_LEN)
 		lua_errorEx(L, "encode string too long %d", len);
 
 #ifdef USE_REF_TAB_AND_LONGSTR
-	if (len >= STRREFLEN && encode_ref(L, idx, p, buff, ref, refn) == C_REF)
+	if (len >= STR_REF_LEN && encode_ref(L, idx, p, buff, ref, refn) == C_REF)
 		return C_REF;
 #endif
 	if (isString) {
@@ -162,7 +163,6 @@ static unsigned char encode_tab(lua_State *L, int idx, int *p, char *buff, int r
 	(*p) += 4;
 	for (lua_pushnil(L); lua_next(L, idx); lua_pop(L, 1))
 	{
-		//if (lua_isnil(L, -1)) continue;//not in table
 		if (lua_isnumber(L, -2)) { //numberkey must int*
 			double V = lua_tonumber(L, -2);
 			long long v = (long long)V;
@@ -234,13 +234,13 @@ LUA_API int lua_encode(lua_State *L)
 #ifdef USE_REF_TAB_AND_LONGSTR
 	lua_createtable(L, 0, 100); //ref,use nrec because k is not serial number
 #endif
-	static char encodeBuffer[MAXCODELEN + 1];
+	static char encodeBuffer[MAX_CODE_LEN + 1];
 	int len = 0;
 	int refn = 0;
 	for (int i = 1; i <= top; i++)
 		encode(L, 0, i, &len, encodeBuffer, top+1, &refn);
 	encodeBuffer[len++] = C_END << 4;
-	if (len > MAXCODELEN)
+	if (len > MAX_CODE_LEN)
 		lua_errorEx(L, "encode string too long %d", len);
 #ifdef LENONHEAD
 	*(int*)(buff) = (int)len;
@@ -293,7 +293,7 @@ static void decode_tab(lua_State *L, const char *s, size_t *pp, int midx)
 				(*pp)++;
 				lua_pushlstring(L, s + *pp, lens);
 #ifdef USE_REF_TAB_AND_LONGSTR
-				if (lens >= STRREFLEN)  decode_mem(L, midx);
+				if (lens >= STR_REF_LEN)  decode_mem(L, midx);
 #endif
 				(*pp) += lens;
 				break;
@@ -346,7 +346,7 @@ static void decode_tab(lua_State *L, const char *s, size_t *pp, int midx)
 				(*pp)++;
 				lua_pushlstring(L, s + *pp, lens);
 #ifdef USE_REF_TAB_AND_LONGSTR
-				if (lens >= STRREFLEN)  decode_mem(L, midx);
+				if (lens >= STR_REF_LEN)  decode_mem(L, midx);
 #endif
 				(*pp) += lens;
 				break; 
@@ -447,7 +447,7 @@ LUA_API int lua_decode(lua_State *L)
 			lens = (int)(unsigned char)s[p]; p++;
 			lua_pushlstring(L, s + p, lens);
 #ifdef USE_REF_TAB_AND_LONGSTR
-			if (lens >= STRREFLEN)  decode_mem(L, top);
+			if (lens >= STR_REF_LEN)  decode_mem(L, top);
 #endif
 			p += lens; break;
 		case C_STR2:
@@ -485,63 +485,3 @@ LUA_API int lua_decode(lua_State *L)
 	}
 	return lua_gettop(L) - top;
 }
-
-//--ing------------------------------
-/*
-LUA_API int lua_encodeBin(lua_State *L)
-{
-	int len = 0;
-	const char* format = luaL_checkstring(L, 2);
-	while (*format) {
-		unsigned n = 0;
-		unsigned char c = *format++;
-
-		while (*format >= '0' && *format <= '9') {
-			n = 10 * n + (*format++) - '0';
-		}
-
-		if (n == 0) n = 1;
-
-		//char *data = lua_newBytes(L, n);
-
-		while (n--) {
-			switch (c) {
-			case 'b':
-			case 'B':
-			case 'h':
-			case 'H':
-			case 'i':
-			case 'I':
-			case 'f':
-			case 'd':
-			case 's':
-			case 'S':
-			case 'M':
-			case 't':
-			case ' ':
-			case ',':
-				break;
-			default:
-				//--Log.Error("WorldPacket pack", "unknown pack code(%d), opcode(%u)", c, pack->GetOpcode());
-				//--LUA_ASSERT(L, false);
-				lua_errorEx(L, "[C]1invalid decodeBin val type %d \n", c);
-				break;
-			}
-		}
-	}
-	return 1;
-}
-LUA_API int lua_decodeBin(lua_State *L)
-{
-	size_t len;
-	const char *s = (const char*)lua_toBytes(L, 1, &len);
-	const char *format = luaL_checkstring(L, 2);
-	int l = R16(s);
-	int code = R16(s + 2);
-	int top = lua_gettop(L);
-
-
-
-	return lua_gettop(L) - top;
-}
-*/

@@ -23,125 +23,24 @@ static int table_new(lua_State *L) {
 	return 1;
 }
 
+static int table_size(lua_State* L)
+{
+	if (!lua_istable(L, 1))
+		lua_errorEx(L, "#1 must table for getsize");
+	lua_sizetable(L, 1); //TODO改的lua
+	return 2;
+}
+
 #ifdef LUAJIT_VERSION
 static int table_duplicate(lua_State *L)
 {
 	if (!lua_istable(L, 1))
 		lua_errorEx(L, "#1 must table for duplicate");
 	lua_duplicatetable(L, 1);
-	//GCtab *t;
-	//lj_gc_check(L);
-	//t = lj_tab_dup(L, tabV(index2adr(L, 1)));
-	//settabV(L, L->top, t);
-	//incr_top(L);
 	return 1;
 }
 //#else
 #endif // LUAJIT_VERSION
-
-static int table_size(lua_State *L)
-{
-	if (!lua_istable(L, 1))
-		lua_errorEx(L, "#1 must table for getsize");
-	lua_sizetable(L, 1); //TODO改的lua
-#ifdef LUAJIT_VERSION
-	//GCtab *t = tabV(index2adr(L, 1));
-	//lua_pushnumber(L, t->asize);
-	//lua_pushnumber(L, t->hmask);
-//#else
-//	Table* t = (Table*)lua_topointer(L, 1);
-//	lua_pushinteger(L, t->sizearray);
-//	lua_pushinteger(L, isdummy(t) ? 0 : sizenode(t));
-#endif
-	return 2;
-}
-
-static int table_weakk(lua_State *L) {
-	int narr = lua_tointeger(L, 1);
-	int nrec = lua_tointeger(L, 2);
-	lua_createtable(L, narr<0 ? 0 : narr, nrec<0 ? 0 : nrec);
-	if (lua_toboolean(L, 3)) { //new meta
-		lua_createtable(L, 0, 1); 
-		lua_pushvalue(L, lua_upvalueindex(2));
-		lua_pushvalue(L, lua_upvalueindex(3));
-		lua_rawset(L, -3);
-	} else
-		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKK");
-	lua_setmetatable(L, -2);
-	return 1;
-}
-
-static int table_weakv(lua_State *L) {
-	int narr = lua_tointeger(L, 1);
-	int nrec = lua_tointeger(L, 2);
-	lua_createtable(L, narr<0 ? 0 : narr, nrec<0 ? 0 : nrec);
-	if (lua_toboolean(L, 3)) {
-		lua_createtable(L, 0, 1);
-		lua_pushvalue(L, lua_upvalueindex(2));
-		lua_pushvalue(L, lua_upvalueindex(3));
-		lua_rawset(L, -3);
-	} else
-		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKV");
-	lua_setmetatable(L, -2);
-	return 1;
-}
-
-static int table_weakkv(lua_State *L) {
-	int narr = lua_tointeger(L, 1);
-	int nrec = lua_tointeger(L, 2);
-	lua_createtable(L, narr<0 ? 0 : narr, nrec<0 ? 0 : nrec);
-	if (lua_toboolean(L, 3)) {
-		lua_createtable(L, 0, 1);
-		lua_pushvalue(L, lua_upvalueindex(2));
-		lua_pushvalue(L, lua_upvalueindex(3));
-		lua_rawset(L, -3);
-	} else
-		lua_pushvalue(L, lua_upvalueindex(1));//luaL_getmetatable(L, "WEAKKV");
-	lua_setmetatable(L, -2);
-	return 1;
-}
-
-static int table_count(lua_State* L)
-{
-	if (!lua_istable(L, 1)) 
-		lua_errorEx(L, "#1 must be a table value");
-	int cnt = 0;
-	for (lua_pushnil(L); lua_next(L, 1); lua_pop(L, 1))
-		cnt++;
-	lua_pushinteger(L, cnt);
-	return 1;
-}
-
-static int table_clear(lua_State* L)
-{
-	if (!lua_istable(L, 1))
-		lua_errorEx(L, "#1 must be a table value");
-//#ifdef LUAJIT_VERSION
-	//GCtab *t = tabV(index2adr(L, 1));
-	//if (t->asize) {
-	//	for (unsigned i = 0; i < t->asize; ++i) {
-	//		setnilV(t->array[i]);
-	//	}
-	//}
-
-//#else
-//	Table* t = (Table*)lua_topointer(L, 1);
-//	if (t->array) {
-//		for (unsigned int i = 0; i < t->sizearray; ++i)
-//			setnilvalue(&t->array[i]);
-//	}
-//	if (!isdummy(t)) {
-//		int size = twoto(t->lsizenode);
-//		for (int i = 0; i < (int)size; i++) {
-//			Node *n = gnode(t, i);
-//			gnext(n) = 0;
-//			setnilvalue(wgkey(n));
-//			setnilvalue(gval(n));
-//		}
-//	}
-//#endif
-	return 1;
-}
 
 //return wk[ud] and wk[ud][k] or meta[k]
 //upv{_WeakK_UD_PROPERTY}
@@ -233,28 +132,11 @@ static int lua_bytesLen(lua_State*L)
 static int lua_bytes2str(lua_State*L)
 {
 	if (lua_isstring(L, 1)) return 1;
-	size_t len; unsigned char *s = (unsigned char*)lua_toBytes(L, 1, &len);
+	size_t len; const char *s = lua_toBytes(L, 1, &len);
 	size_t i = indexn0(luaL_optint(L, 2, 1), len);
 	size_t j = indexn(luaL_optint(L, 3, -1), len);
 	lua_pushlstring(L, s, len);
 	return 1;
-}
-
-static int debug_getargs(lua_State*L)
-{
-	int top = lua_gettop(L);
-	if (!lua_isfunction(L, 1) || top!=1) {
-		lua_errorEx(L, "#1 debug.getargs only need a function");
-		return 0;
-	}
-	const char *name;
-	int i = 1;
-	while ((name = lua_getlocal(L, NULL, i++)) != NULL) {
-		lua_pushstring(L, name);
-		lua_insert(L, -2);
-	}
-	lua_pop(L, 1);
-	return lua_gettop(L);
 }
 
 
@@ -412,16 +294,26 @@ LUA_API void lua_setfieldUD(lua_State *L, int idx, char *name)
 
 //os---------------------------------------------------------------
 
-
-//test-------------------------------------------------------------
-#ifdef _DEBUG
-void luaValueDump(lua_State *L, int idx)
+//debug------------------------------------------------------------
+//debug.getargs(function)
+static int debug_getargs(lua_State* L)
 {
-	lua_getglobal(L, "dump");
-	lua_pushvalue(L, idx>0?idx:(idx-1));
-	lua_call(L, 1, 0);
+	int top = lua_gettop(L);
+	if (!lua_isfunction(L, 1) || top != 1) {
+		lua_errorEx(L, "#1 debug.getargs only need a function");
+		return 0;
+	}
+	const char* name;
+	int i = 1;
+	while ((name = lua_getlocal(L, NULL, i++)) != NULL) {
+		lua_pushstring(L, name);
+		lua_insert(L, -2);
+	}
+	lua_pop(L, 1);
+	return lua_gettop(L);
 }
-void luaStackDump(lua_State *L)
+//debug.stack_dump()
+LUA_API int lua_stackDump(lua_State* L)
 {
 	int top = lua_gettop(L);
 	printf("[C]dump stack:\n");
@@ -430,7 +322,7 @@ void luaStackDump(lua_State *L)
 		int iindex = -1 - i;
 		int itype = lua_type(L, iindex);
 		printf("stack :%d  ", iindex);
-		switch (itype)	{
+		switch (itype) {
 		case LUA_TSTRING:
 			printf("'%s'", lua_tostring(L, iindex));
 			break;
@@ -447,14 +339,7 @@ void luaStackDump(lua_State *L)
 		printf("\n");
 	}
 }
-int lua_test(lua_State *L)
-{
-	lua_pushinteger(L, 1);
-	lua_pushinteger(L, 2);
-	lua_insert(L, -2);
-	return 2;
-}
-#endif
+
 
 //-------------------------------------------------------------
 LUA_API void luaopen_extend(lua_State *L) {
@@ -495,85 +380,51 @@ LUA_API void luaopen_extend(lua_State *L) {
 	lua_pushvalue(L, weakk);//luaL_getmetatable(L, "WEAKK");
 	lua_setmetatable(L, -2);
 	_WeakK_BytesLenth = lua_ref(L, -1);
+	lua_pop(L, 3); //pop weak3
 
 	//bytes metatable
 	lua_createtable(L, 0, 3); //tb
-	lua_pushliteral(L, "__index");//tb,"__index"
-	lua_pushliteral(L, "");//tb,"__index",""
-	lua_getmetatable(L, -1);//tb,"__index","",stringmt
-	lua_remove(L, -2); //tb,"__index",stringmt
+		lua_pushliteral(L, "__index");//tb,"__index"
+		lua_pushliteral(L, "");//tb,"__index",""
+		lua_getmetatable(L, -1);//tb,"__index","",stringmt
+		lua_remove(L, -2); //tb,"__index",stringmt
 
-	lua_pushliteral(L, "__index");//tb,"__index",stringmt,"__index"
-	lua_rawget(L, -2);//tb,"__index",stringmt,__index
-	lua_remove(L, -2); //tb,"__index",__index
-	lua_rawset(L, -3); //tb
+		lua_pushliteral(L, "__index");//tb,"__index",stringmt,"__index"
+		lua_rawget(L, -2);//tb,"__index",stringmt,__index
+		lua_remove(L, -2); //tb,"__index",__index
+		lua_rawset(L, -3); //tb
 
-	lua_pushliteral(L, "__len");//tb,"__len"
-	lua_getref(L, _WeakK_BytesLenth);//lua_pushcfunction(L, lua_bytesLen);
-	lua_pushcclosure(L, lua_bytesLen, 1);
-	lua_rawset(L, -3);
+		lua_pushliteral(L, "__len");//tb,"__len"
+		lua_getref(L, _WeakK_BytesLenth);//lua_pushcfunction(L, lua_bytesLen);
+		lua_pushcclosure(L, lua_bytesLen, 1);
+		lua_rawset(L, -3);
 
-	lua_pushliteral(L, "tostr");//tb,"__len"
-	lua_getglobal(L, "string");
-	lua_getfield(L, -1, "tostr");
-	lua_replace(L, -2);
-	//lua_pushcclosure(L, lua_bytes2str, 0); //lua_bytes_tostr重复
-	lua_rawset(L, -3);
-
+		lua_pushliteral(L, "tostr");//tb,"__len"
+		//lua_getglobal(L, "string");
+		//lua_getfield(L, -1, "tostr");
+		//lua_replace(L, -2);
+		lua_pushcclosure(L, lua_bytes2str, 0); //lua_bytes_tostr重复
+		lua_rawset(L, -3);
 	_BytesMeta = lua_ref(L, -1);
 
 	//table-----------------------------------------------
 	lua_getglobal(L, "table");
-	lua_pushcfunction(L, table_new);
-	lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, table_new);
+		lua_setfield(L, -2, "new");
+		lua_pushcfunction(L, table_size);
+		lua_setfield(L, -2, "size");
 #ifdef LUAJIT_VERSION
-	lua_pushcfunction(L, table_duplicate);
-	lua_setfield(L, -2, "duplicate");
-#endif
-	lua_pushcfunction(L, table_size);
-	lua_setfield(L, -2, "size");
-
-	lua_pushvalue(L, weakk); //luaL_getmetatable(L, "WEAKK");
-	lua_pushliteral(L, "__mode");
-	lua_pushliteral(L, "k");
-	lua_pushcclosure(L, table_weakk, 3);
-	lua_setfield(L, -2, "weakk");
-
-	lua_pushvalue(L, weakv); //luaL_getmetatable(L, "WEAKV");
-	lua_pushliteral(L, "__mode");
-	lua_pushliteral(L, "v");
-	lua_pushcclosure(L, table_weakv, 3);
-	lua_setfield(L, -2, "weakv");
-
-	lua_pushvalue(L, weakkv); //luaL_getmetatable(L, "WEAKKV");
-	lua_pushliteral(L, "__mode");
-	lua_pushliteral(L, "kv");
-	lua_pushcclosure(L, table_weakkv, 3);
-	lua_setfield(L, -2, "weakkv");
-
-	lua_pushcfunction(L, table_count);
-	lua_setfield(L, -2, "count");
-	lua_pushcfunction(L, table_clear);
-	lua_setfield(L, -2, "clear");
-
-	lua_pop(L, 3); //pop weak3
-
-
-#if !defined LUA_VERSION_NUM || LUA_VERSION_NUM==501 //Adapted from Lua 5.2+
-	lua_getglobal(L, "unpack");
-	lua_setfield(L, -2, "unpack");
+		lua_pushcfunction(L, table_duplicate);
+		lua_setfield(L, -2, "duplicate");
 #endif
 	lua_pop(L, 1); //pop table
 
 	lua_getglobal(L, "debug");
-	lua_pushcfunction(L, debug_getargs);
-	lua_setfield(L, -2, "getargs");
+		lua_pushcfunction(L, debug_getargs);
+		lua_setfield(L, -2, "getargs");
+		lua_pushcfunction(L, lua_stackDump);
+		lua_setfield(L, -2, "stack_dump");
+
 	lua_pop(L, 1);//pop debug
 
-#ifdef _DEBUG
-	lua_pushinteger(L, 1);
-	lua_pushinteger(L, 2);
-	lua_pushcclosure(L, lua_test, 2);
-	lua_setglobal(L, "_test");
-#endif
 }

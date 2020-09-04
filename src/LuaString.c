@@ -480,9 +480,9 @@ static int lua_str_to16l(lua_State *L) {
 }
 static int lua_str_to16b(lua_State *L) {
 	size_t len = 0;
-	char *s0 = (char *)lua_toBytes(L, 1, &len);
+	const char *s0 = lua_toBytes(L, 1, &len);
 	int first = luaL_optint(L, 2, 1);
-	short v = R16l(s0 + first - 1);
+	short v = R16l((char*)s0 + first - 1);
 	int bSigned = lua_toboolean(L, 3);
 	if (bSigned)
 		lua_pushinteger(L, v);
@@ -504,9 +504,9 @@ static int lua_str_to32l(lua_State *L) {
 }
 static int lua_str_to32b(lua_State *L) {
 	size_t len = 0;
-	char *s0 = (char *)lua_toBytes(L, 1, &len);
+	const char* s0 = lua_toBytes(L, 1, &len);
 	int first = luaL_optint(L, 2, 1);
-	int v = R32l(s0 + first - 1);
+	int v = R32l((char*)s0 + first - 1);
 	int bSigned = lua_toboolean(L, 3);
 	if (bSigned)
 		lua_pushinteger(L, v);
@@ -528,9 +528,9 @@ static int lua_str_to64l(lua_State *L) {
 }
 static int lua_str_to64b(lua_State *L) {
 	size_t len = 0;
-	char *s0 = (char *)lua_toBytes(L, 1, &len);
+	const char *s0 = lua_toBytes(L, 1, &len);
 	int first = luaL_optint(L, 2, 1);
-	long long v = R64l(s0 + first - 1);
+	long long v = R64l((char*)s0 + first - 1);
 	int bSigned = lua_toboolean(L, 3);
 	if (bSigned)
 		lua_pushnumber(L, v);
@@ -710,9 +710,8 @@ static int lua_str_xor(lua_State *L)
 //}
 static int lua_bytes_tostr(lua_State *L)
 {
-	if (lua_isstring(L, 1))
-		return 1;
-	size_t len; unsigned char *s = (unsigned char*)lua_toBytes(L, 1, &len);
+	if (lua_isstring(L, 1)) return 1;
+	size_t len; const char *s = lua_toBytes(L, 1, &len);
 	size_t i = indexn0(luaL_optint(L, 2, 1), len);
 	size_t j = indexn(luaL_optint(L, 3, -1), len);
 	lua_pushlstring(L, s, len);
@@ -723,58 +722,57 @@ void lua_openstringEx(lua_State *L)
 {
 	lua_register(L, "_md5sum", lua_md5sum);
 	lua_getglobal(L, "string");
-	lua_pushcfunction(L, lua_str_to16l);
-	lua_setfield(L, -2, "to16l");
-	lua_pushcfunction(L, lua_str_to16b);
-	lua_setfield(L, -2, "to16b");
-	lua_pushcfunction(L, lua_str_to32l);
-	lua_setfield(L, -2, "to32l");
-	lua_pushcfunction(L, lua_str_to32b);
-	lua_setfield(L, -2, "to32b");
-	lua_pushcfunction(L, lua_str_to64l);
-	lua_setfield(L, -2, "to64l");
-	lua_pushcfunction(L, lua_str_to64b);
-	lua_setfield(L, -2, "to64b");
-	lua_pushcfunction(L, lua_str_from16l);
-	lua_setfield(L, -2, "from16l");
-	lua_pushcfunction(L, lua_str_from16b);
-	lua_setfield(L, -2, "from16b");
-	lua_pushcfunction(L, lua_str_from32l);
-	lua_setfield(L, -2, "from32l");
-	lua_pushcfunction(L, lua_str_from32b);
-	lua_setfield(L, -2, "from32b");
-	lua_pushcfunction(L, lua_str_from64l);
-	lua_setfield(L, -2, "from64l");
-	lua_pushcfunction(L, lua_str_from64b);
-	lua_setfield(L, -2, "from64b");
-	lua_pushcfunction(L, lua_str_enurl);
-	lua_setfield(L, -2, "enurl");
-	lua_pushcfunction(L, lua_str_deurl);
-	lua_setfield(L, -2, "deurl");
-	lua_pushcfunction(L, lua_str_enbase64);
-	lua_setfield(L, -2, "enbase64");
-	lua_pushcfunction(L, lua_str_debase64);
-	lua_setfield(L, -2, "debase64");
-	lua_pushcfunction(L, lua_md5);
-	lua_setfield(L, -2, "md5");
-	lua_pushcfunction(L, lua_str_hmacmd5);
-	lua_setfield(L, -2, "hmacmd5");
-	lua_pushcfunction(L, str_sha1);
-	lua_setfield(L, -2, "sha1");
-	lua_pushcfunction(L, str_hmacsha1);
-	lua_setfield(L, -2, "hmacsha1");
-	lua_pushcfunction(L, lua_str_ucs);
-	lua_setfield(L, -2, "ucs");
-	lua_pushcfunction(L, lua_str_utf);
-	lua_setfield(L, -2, "utf");
-	lua_pushcfunction(L, lua_str_lead);
-	lua_setfield(L, -2, "lead");
-	lua_pushcfunction(L, lua_str_tail);
-	lua_setfield(L, -2, "tail");
-	lua_pushcfunction(L, lua_str_xor);
-	lua_setfield(L, -2, "xor");
-	lua_pushcfunction(L, lua_bytes_tostr);
-	lua_setfield(L, -2, "tostr"); 
-	
+		lua_pushcfunction(L, lua_str_to16l);
+		lua_setfield(L, -2, "to16l");
+		lua_pushcfunction(L, lua_str_to16b);
+		lua_setfield(L, -2, "to16b");
+		lua_pushcfunction(L, lua_str_to32l);
+		lua_setfield(L, -2, "to32l");
+		lua_pushcfunction(L, lua_str_to32b);
+		lua_setfield(L, -2, "to32b");
+		lua_pushcfunction(L, lua_str_to64l);
+		lua_setfield(L, -2, "to64l");
+		lua_pushcfunction(L, lua_str_to64b);
+		lua_setfield(L, -2, "to64b");
+		lua_pushcfunction(L, lua_str_from16l);
+		lua_setfield(L, -2, "from16l");
+		lua_pushcfunction(L, lua_str_from16b);
+		lua_setfield(L, -2, "from16b");
+		lua_pushcfunction(L, lua_str_from32l);
+		lua_setfield(L, -2, "from32l");
+		lua_pushcfunction(L, lua_str_from32b);
+		lua_setfield(L, -2, "from32b");
+		lua_pushcfunction(L, lua_str_from64l);
+		lua_setfield(L, -2, "from64l");
+		lua_pushcfunction(L, lua_str_from64b);
+		lua_setfield(L, -2, "from64b");
+		lua_pushcfunction(L, lua_str_enurl);
+		lua_setfield(L, -2, "enurl");
+		lua_pushcfunction(L, lua_str_deurl);
+		lua_setfield(L, -2, "deurl");
+		lua_pushcfunction(L, lua_str_enbase64);
+		lua_setfield(L, -2, "enbase64");
+		lua_pushcfunction(L, lua_str_debase64);
+		lua_setfield(L, -2, "debase64");
+		lua_pushcfunction(L, lua_md5);
+		lua_setfield(L, -2, "md5");
+		lua_pushcfunction(L, lua_str_hmacmd5);
+		lua_setfield(L, -2, "hmacmd5");
+		lua_pushcfunction(L, str_sha1);
+		lua_setfield(L, -2, "sha1");
+		lua_pushcfunction(L, str_hmacsha1);
+		lua_setfield(L, -2, "hmacsha1");
+		lua_pushcfunction(L, lua_str_ucs);
+		lua_setfield(L, -2, "ucs");
+		lua_pushcfunction(L, lua_str_utf);
+		lua_setfield(L, -2, "utf");
+		lua_pushcfunction(L, lua_str_lead);
+		lua_setfield(L, -2, "lead");
+		lua_pushcfunction(L, lua_str_tail);
+		lua_setfield(L, -2, "tail");
+		lua_pushcfunction(L, lua_str_xor);
+		lua_setfield(L, -2, "xor");
+		lua_pushcfunction(L, lua_bytes_tostr);
+		lua_setfield(L, -2, "tostr"); 
 	lua_pop(L, 1);
 }

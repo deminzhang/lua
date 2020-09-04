@@ -53,12 +53,9 @@ LUA_API void lua_getfieldUD(lua_State *L, int idx, char *name);
 //set element from hangtable of userdata  //stack-1
 LUA_API void lua_setfieldUD(lua_State *L, int idx, char *name);
 
+LUA_API int lua_stackDump(lua_State* L);
 
 //open
 LUA_API void luaopen_extend(lua_State *L);
 
-#ifdef _DEBUG //ต๗สิ
-void luaValueDump(lua_State *L, int idx);
-void luaStackDump(lua_State *L);
-#endif
 #endif

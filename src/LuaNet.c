@@ -716,7 +716,7 @@ static int luanet_send(lua_State *L)
 		return 0;
 	}
 	size_t len = 0;
-	char *s = (char *)lua_toBytes(L, 2, &len);
+	const char *s = (char *)lua_toBytes(L, 2, &len);
 #ifdef LENONHEAD
 	len = (int)(*s);
 	len += 4;
@@ -775,7 +775,7 @@ static int luanet_sendBinary(lua_State *L) //ing
 		return 0;
 	}
 	size_t len = 0;
-	char *s = (char *)lua_toBytes(L, 2, &len);
+	const char *s = (char *)lua_toBytes(L, 2, &len);
 	//const char *buff = (char*)lua_newBytes(L, 1024 * 64);
 	static char buff[1024 * 64];
 	int i;

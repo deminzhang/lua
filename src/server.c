@@ -348,7 +348,6 @@ int main(int argc, char *argv[], char *envs[])
 	lua_pushliteral(L, ARCH);
 	lua_setfield(L, -2, "arch");
 
-	int i = 1;
 #if _WIN32
 	for (char *s; s = *args; args++) {
 #else //linux子进程参数

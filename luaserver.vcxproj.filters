@@ -54,5 +54,8 @@
     <ClCompile Include="src\LuaZip.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\LuaProtoBuf.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

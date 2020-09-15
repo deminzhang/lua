@@ -45,7 +45,7 @@
 static void encode(lua_State *L, int kidx, int vidx, int *offset, char *buff,int ref, int *refn);
 
 #ifdef USE_REF_TAB_AND_LONGSTR
-static unsigned char encode_ref(lua_State *L,int idx,int *p,char *buff,int ref,int *refn)
+static unsigned char encode_ref(lua_State *L,int idx,int *p,char *buf,int ref,int *refn)
 {
 	lua_pushvalue(L, ref); //ref tab
 	size_t pk = (size_t)lua_topointer(L, idx);
@@ -60,14 +60,14 @@ static unsigned char encode_ref(lua_State *L,int idx,int *p,char *buff,int ref,i
 		return C_NIL;
 	}
 	//refed idx
-	*(REF_LEN_TYPE*)(buff + (*p)) = (REF_LEN_TYPE)lua_tonumber(L, -1);
+	*(REF_LEN_TYPE*)(buf + (*p)) = (REF_LEN_TYPE)lua_tonumber(L, -1);
 	(*p) += sizeof(REF_LEN_TYPE);
 	lua_pop(L, 2); //pop pk,ref
 	return C_REF;
 }
 #endif
 
-static unsigned char encode_num(lua_State *L, int idx, int *p, char *buff)
+static unsigned char encode_num(lua_State *L, int idx, int *p, char *buf)
 {
 	unsigned char ctype;
 	double V = lua_tonumber(L, idx);
@@ -79,7 +79,7 @@ static unsigned char encode_num(lua_State *L, int idx, int *p, char *buff)
 	if (v != V) { //double=0x6,double
 		//if (V != (double)(float)V ){ //?check
 			ctype = C_FLOAT8;
-			*(double*)(buff + (*p)) = V;
+			*(double*)(buf + (*p)) = V;
 			(*p) += sizeof(double);
 		//}
 		//else {
@@ -90,53 +90,53 @@ static unsigned char encode_num(lua_State *L, int idx, int *p, char *buff)
 	}
 	else if (v == (char)v) {
 		ctype = C_INT1;
-		*(char*)(buff + (*p)) = (char)v;
+		*(char*)(buf + (*p)) = (char)v;
 		(*p) += sizeof(char);
 	}
 	else if (v == (short)v) {
 		ctype = C_INT2;
-		*(short*)(buff + (*p)) = (short)v;
+		*(short*)(buf + (*p)) = (short)v;
 		(*p) += sizeof(short);
 	}
 	else if (v == (int)v) {
 		ctype = C_INT4;
-		*(int*)(buff + (*p)) = (int)v;
+		*(int*)(buf + (*p)) = (int)v;
 		(*p) += sizeof(int);
 	}
 	else {
 		ctype = C_INT8;
-		*(long long*)(buff + (*p)) = v;
+		*(long long*)(buf + (*p)) = v;
 		(*p) += sizeof(long long);
 	}
 	return ctype;
 }
-static unsigned char encode_str(lua_State *L, int idx, int *p, char *buff, int ref, int *refn)
+static unsigned char encode_str(lua_State *L, int idx, int *p, char *buf, int ref, int *refn)
 {
 	char ctype;
 	size_t len;
-	int isString = lua_isstring(L, idx);
 	const char *s = lua_toBytes(L, idx, &len);
 	if (len > MAX_STR_LEN)
 		lua_errorEx(L, "encode string too long %d", len);
 
 #ifdef USE_REF_TAB_AND_LONGSTR
-	if (len >= STR_REF_LEN && encode_ref(L, idx, p, buff, ref, refn) == C_REF)
+	if (len >= STR_REF_LEN && encode_ref(L, idx, p, buf, ref, refn) == C_REF)
 		return C_REF;
 #endif
+	int isString = lua_isstring(L, idx);
 	if (isString) {
 		if (len < 256) { //len=uchar
 			ctype = C_STR1;
-			*(unsigned char*)(buff + (*p)) = (unsigned char)len;
+			*(unsigned char*)(buf + (*p)) = (unsigned char)len;
 			(*p) += 1;
 		}
 		else if (len == (unsigned short)len) { //len=ushort
 			ctype = C_STR2;
-			*(unsigned short*)(buff + (*p)) = (unsigned short)len;
+			*(unsigned short*)(buf + (*p)) = (unsigned short)len;
 			(*p) += 2;
 		}
 		else { //len=int
 			ctype = C_STR4;
-			*(int*)(buff + (*p)) = (int)len;
+			*(int*)(buf + (*p)) = (int)len;
 			(*p) += 4;
 		}
 	}
@@ -144,17 +144,17 @@ static unsigned char encode_str(lua_State *L, int idx, int *p, char *buff, int r
 		if (len > 0xffff)
 			lua_errorEx(L, "encode string too long %d", len);
 		ctype = C_ENCODED;
-		*(unsigned short*)(buff + (*p)) = (unsigned short)len;
+		*(unsigned short*)(buf + (*p)) = (unsigned short)len;
 		(*p) += 2;
 	}
-	memcpy(buff+ *p, s, len);
+	memcpy(buf+ *p, s, len);
 	(*p) += len;
 	return ctype;
 }
-static unsigned char encode_tab(lua_State *L, int idx, int *p, char *buff, int ref, int *refn)
+static unsigned char encode_tab(lua_State *L, int idx, int *p, char *buf, int ref, int *refn)
 {
 #ifdef USE_REF_TAB_AND_LONGSTR
-	if ( encode_ref(L, idx, p, buff, ref, refn) == C_REF)
+	if ( encode_ref(L, idx, p, buf, ref, refn) == C_REF)
 		return C_REF;
 #endif
 	int top = lua_gettop(L);
@@ -169,14 +169,14 @@ static unsigned char encode_tab(lua_State *L, int idx, int *p, char *buff, int r
 			if (v != V || v != v << 10 >> 10)
 				lua_errorEx(L, "number %f out of signed 54bit range", V);
 		}
-		encode(L, top+1, top+2, p, buff, ref, refn);
+		encode(L, top+1, top+2, p, buf, ref, refn);
 		tabn++;
 	}
-	*(int*)(buff + pn) = tabn;
-	buff[(*p)++] = C_END;
+	*(int*)(buf + pn) = tabn;
+	buf[(*p)++] = C_END;
 	return C_TABLE;
 }
-static void encode(lua_State *L, int kidx, int vidx, int *p, char *buff, int ref, int *refn)
+static void encode(lua_State *L, int kidx, int vidx, int *p, char *buf, int ref, int *refn)
 {
 	unsigned char ktype = C_NIL;
 	int kvtoffset = (*p)++;
@@ -185,14 +185,14 @@ static void encode(lua_State *L, int kidx, int vidx, int *p, char *buff, int ref
 		switch (kt)
 		{
 		case LUA_TNUMBER:
-			ktype = encode_num(L, kidx, p, buff);
+			ktype = encode_num(L, kidx, p, buf);
 			break;
 		case LUA_TSTRING:
 		case LUA_TUSERDATA:
-			ktype = encode_str(L, kidx, p, buff, ref, refn);
+			ktype = encode_str(L, kidx, p, buf, ref, refn);
 			break;
 		case LUA_TTABLE:
-			ktype = encode_tab(L, kidx, p, buff, ref, refn);
+			ktype = encode_tab(L, kidx, p, buf, ref, refn);
 			break;
 		default:
 			lua_errorEx(L, "unsurrpot encode ktype %s", lua_typename(L, kt));
@@ -204,20 +204,20 @@ static void encode(lua_State *L, int kidx, int vidx, int *p, char *buff, int ref
 	{
 	case LUA_TNIL:
 		if (ktype==C_NIL) // not in table,in args
-			buff[kvtoffset] = ktype << 4 | C_NIL;
+			buf[kvtoffset] = ktype << 4 | C_NIL;
 		break;
 	case LUA_TBOOLEAN:
-		buff[kvtoffset] = ktype << 4 | (lua_toboolean(L, vidx) ? C_TRUE : C_FALSE);
+		buf[kvtoffset] = ktype << 4 | (lua_toboolean(L, vidx) ? C_TRUE : C_FALSE);
 		break;
 	case LUA_TNUMBER:
-		buff[kvtoffset] = ktype << 4 | encode_num(L, vidx, p, buff);
+		buf[kvtoffset] = ktype << 4 | encode_num(L, vidx, p, buf);
 		break;
 	case LUA_TSTRING:
 	case LUA_TUSERDATA:
-		buff[kvtoffset] = ktype << 4 | encode_str(L, vidx, p, buff, ref, refn);
+		buf[kvtoffset] = ktype << 4 | encode_str(L, vidx, p, buf, ref, refn);
 		break;
 	case LUA_TTABLE: 
-		buff[kvtoffset] = ktype << 4 | encode_tab(L, vidx, p, buff, ref, refn);
+		buf[kvtoffset] = ktype << 4 | encode_tab(L, vidx, p, buf, ref, refn);
 		break;
 	default:
 		lua_errorEx(L, "unsurrpot encode vtype %s", lua_typename(L, vt));
@@ -234,12 +234,12 @@ LUA_API int lua_encode(lua_State *L)
 #ifdef USE_REF_TAB_AND_LONGSTR
 	lua_createtable(L, 0, 100); //ref,use nrec because k is not serial number
 #endif
-	static char encodeBuffer[MAX_CODE_LEN + 1];
+	static char buf[MAX_CODE_LEN + 1];
 	int len = 0;
 	int refn = 0;
 	for (int i = 1; i <= top; i++)
-		encode(L, 0, i, &len, encodeBuffer, top+1, &refn);
-	encodeBuffer[len++] = C_END << 4;
+		encode(L, 0, i, &len, buf, top+1, &refn);
+	buf[len++] = C_END << 4;
 	if (len > MAX_CODE_LEN)
 		lua_errorEx(L, "encode string too long %d", len);
 #ifdef LENONHEAD
@@ -247,7 +247,7 @@ LUA_API int lua_encode(lua_State *L)
 	len += 4;
 #endif // LENONHEAD
 	char *buff1 = (char*)lua_newBytes(L, len);
-	memcpy(buff1, encodeBuffer, len);
+	memcpy(buff1, buf, len);
 	lua_pushinteger(L, len);
 	return 2;
 }
@@ -420,7 +420,7 @@ LUA_API int lua_decode(lua_State *L)
 		break;
 	}
 #else
-	const char *s = (const char*)lua_toBytes(L, 1, &len);
+	const char *s = lua_toBytes(L, 1, &len);
 #endif // LENONHEAD
 
 	int lens;
@@ -485,3 +485,17 @@ LUA_API int lua_decode(lua_State *L)
 	}
 	return lua_gettop(L) - top;
 }
+
+
+LUA_API void luaopen_decode(lua_State* L)
+{
+	lua_createtable(L, 0, 2);
+	lua_pushcfunction(L, lua_encode);
+	lua_setfield(L, -2, "encode");
+	lua_pushcfunction(L, lua_decode);
+	lua_setfield(L, -2, "decode");
+	lua_setglobal(L, "luacode");
+	lua_register(L, "_encode", lua_encode);
+	lua_register(L, "_decode", lua_decode);
+}
+

@@ -30,11 +30,23 @@
 
 
 //base------------------------------------------------------------
-//int2 SNNNNNNN NNNNNNNN
-//int4 SNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN
-//int8 SNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
+//pqint2 SNNNNNNN NNNNNNNN
+//pqint4 SNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN
+//pqint8 SNNNNNNN NNNNNNNN NNNNNNNN NNNNNNNN MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
 //float SEEEEEEE EMMMMMMM MMMMMMMM MMMMMMMM
 //double SEEEEEEE EEEEMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM MMMMMMMM
+
+#define int8 char
+#define uint8 unsigned char
+#define int16 short
+#define uint16 unsigned short
+#define int32 int
+#define uint32 unsigned int
+#define int64 long long
+#define uint64 unsigned long long
+#define float32 float
+#define float64 double
+
 //low - high  host memory use " \0" >> 32
 #define R16(p) *(short*)(p)
 #define R32(p) *(int*)(p)
@@ -48,7 +60,7 @@
 #define WFl(p,v) *(float*)(p) = (float)(v)
 #define WDb(p,v) *(double*)(p) = (double)(v)
 
-//high-low  net use //"\0 " >> 32
+//high-low  net use "\0 " >> 32
 static  short R16l(char *p)
 {
 	char s[] = { p[1], p[0] };

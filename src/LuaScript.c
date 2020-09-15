@@ -135,7 +135,18 @@ static int lua_bytes2str(lua_State*L)
 	size_t len; const char *s = lua_toBytes(L, 1, &len);
 	size_t i = indexn0(luaL_optint(L, 2, 1), len);
 	size_t j = indexn(luaL_optint(L, 3, -1), len);
-	lua_pushlstring(L, s, len);
+	lua_pushlstring(L, s + i, j - i);
+	return 1;
+}
+
+static int lua_str_tostring(lua_State*L)
+{
+	if (lua_isstring(L, 1)) return 1;
+	size_t len; const char *s = lua_toBytes(L, 1, &len);
+
+	for (int x = 0; x < len; x++)
+		lua_pushfstring(L, "%d ", (unsigned char)s[x]);
+	lua_concat(L, len);
 	return 1;
 }
 
@@ -160,6 +171,7 @@ LUA_API char *lua_newBytes(lua_State *L, int size)
 	char *u = (char*)lua_newuserdata(L, size);
 	lua_getref(L, _BytesMeta);
 	lua_setmetatable(L, -2);
+	lua_setBytesLen(L, -1, size);
 	return u;
 }
 
@@ -177,6 +189,7 @@ LUA_API const char *lua_toBytes(lua_State *L, int idx, size_t *len)
 	if (lua_isstring(L, idx))
 		return lua_tolstring(L, idx, len);
 	else if (lua_isuserdata(L, idx)) {
+		*len = lua_objlen(L, idx);
 		lua_getmetatable(L, idx);
 		lua_getref(L, _BytesMeta);
 		if (lua_equal(L, -1, -2)) {
@@ -184,7 +197,8 @@ LUA_API const char *lua_toBytes(lua_State *L, int idx, size_t *len)
 			lua_getref(L, _WeakK_BytesLenth);
 			lua_pushvalue(L, idx>0 ? idx : idx - 1);
 			lua_rawget(L, -2);
-			*len = lua_isnil(L, -1) ? lua_objlen(L, idx) : lua_tointeger(L, -1);
+			if (!lua_isnil(L, -1))
+				*len = lua_tointeger(L, -1);
 			lua_pop(L, 2);
 			return (const char *)lua_touserdata(L, idx);
 		}
@@ -338,6 +352,7 @@ LUA_API int lua_stackDump(lua_State* L)
 		}
 		printf("\n");
 	}
+	return top;
 }
 
 
@@ -399,12 +414,14 @@ LUA_API void luaopen_extend(lua_State *L) {
 		lua_pushcclosure(L, lua_bytesLen, 1);
 		lua_rawset(L, -3);
 
-		lua_pushliteral(L, "tostr");//tb,"__len"
-		//lua_getglobal(L, "string");
-		//lua_getfield(L, -1, "tostr");
-		//lua_replace(L, -2);
-		lua_pushcclosure(L, lua_bytes2str, 0); //lua_bytes_tostr÷ÿ∏¥
+		lua_pushliteral(L, "__tostring");//
+		lua_pushcfunction(L, lua_str_tostring);
 		lua_rawset(L, -3);
+
+		lua_pushliteral(L, "tostr");//tb,"__len"
+		lua_pushcfunction(L, lua_bytes2str); //lua_bytes_tostr÷ÿ∏¥
+		lua_rawset(L, -3);
+
 	_BytesMeta = lua_ref(L, -1);
 
 	//table-----------------------------------------------

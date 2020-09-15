@@ -15,6 +15,7 @@ extern "C" {
 #include "LuaMySql.h"
 #include "LuaSqlite3.h"
 #include "LuaZip.h"
+#include "LuaProtoBuf.h"
 #ifdef __cplusplus
 }
 #endif //__cplusplus
@@ -287,11 +288,11 @@ int main(int argc, char *argv[], char *envs[])
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
 	luaopen_extend(L);
+	luaopen_decode(L);
+	luaopen_protobuf(L);
 
 	//global----------------------------------
 	lua_register(L, "_now", lua__now);
-	lua_register(L, "_encode", lua_encode);
-	lua_register(L, "_decode", lua_decode);
 	lua_register(L, "_timestr", lua_timestr);
 	lua_register(L, "_time", lua__time);
 

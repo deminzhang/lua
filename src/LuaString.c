@@ -702,19 +702,27 @@ static int lua_str_xor(lua_State *L)
 	free(r);
 	return 1;
 }
-//static int lua_str_tobyte(lua_State *L)
-//{
-//	size_t l; unsigned char *s = (unsigned char*)lua_toBytes(L, 1, &l);
-//	size_t i = indexn0(luaL_optint(L, 2, 1), l);
-//	
-//}
 static int lua_bytes_tostr(lua_State *L)
 {
 	if (lua_isstring(L, 1)) return 1;
 	size_t len; const char *s = lua_toBytes(L, 1, &len);
 	size_t i = indexn0(luaL_optint(L, 2, 1), len);
 	size_t j = indexn(luaL_optint(L, 3, -1), len);
-	lua_pushlstring(L, s, len);
+	lua_pushlstring(L, s + i, j - i);
+	return 1;
+}
+static int lua_str_tostring(lua_State* L)
+{
+	size_t len; const char* s = lua_toBytes(L, 1, &len);
+	for (int x = 0; x < len; x++)
+		lua_pushfstring(L, "%d", (unsigned char)s[x]);
+	lua_concat(L, len);
+	return 1;
+}
+static int lua_str_newBytes(lua_State* L)
+{
+	int len = lua_tointeger(L, 1);
+	char* buf = (char*)lua_newBytes(L, len);
 	return 1;
 }
 //reg2lua-------------------------------------------------------
@@ -774,5 +782,9 @@ void lua_openstringEx(lua_State *L)
 		lua_setfield(L, -2, "xor");
 		lua_pushcfunction(L, lua_bytes_tostr);
 		lua_setfield(L, -2, "tostr"); 
+		lua_pushcfunction(L, lua_str_tostring);
+		lua_setfield(L, -2, "tostring"); 
+		lua_pushcfunction(L, lua_str_newBytes);
+		lua_setfield(L, -2, "newbyte"); 
 	lua_pop(L, 1);
 }

@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="include\sqlite3.c" />
     <ClCompile Include="src\LuaCode.c" />
+    <ClCompile Include="src\LuaProtoBuf.c" />
     <ClCompile Include="src\LuaQueue.c" />
     <ClCompile Include="src\LuaSqlite3.c" />
     <ClCompile Include="src\LuaString.c" />

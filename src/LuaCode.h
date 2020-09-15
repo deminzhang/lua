@@ -7,5 +7,6 @@
 
 LUA_API int lua_encode(lua_State *L);
 LUA_API int lua_decode(lua_State *L);
+LUA_API void luaopen_decode(lua_State* L);
 
 #endif

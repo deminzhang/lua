@@ -79,125 +79,141 @@ _G._callout = _callout or function(o,onCallout)
 end
 --]]
 
+function protoc(package, files)
+
+
+end
 
 function protobufdev()
 	assert(proto,'proto required')
 	dump(proto)
-	local protos = {}
-	setmetatable(proto, {__index=protos})
-	do
-		local TestEnum = {
-			MONDAY = 0,
-			SUNDAY = 1,
-		} 
-		protos.TestEnum = TestEnum
-	end
-	do
-		local TestChild = {} 
-		local _meta
-		_meta = {
-			fields = {
-				{proto.OPT, proto.sint64, 'Fsint64',1 },
-			},
-			__index = {
-				Marshal = proto.encode,
-				Unmarshal = function(buf)
-					return proto.decode(buf,setmetatable({}, _meta))
-				end,
-			},
-			__call = function(self,t)
-				return setmetatable(t, _meta)
-			end,
-		}
-		setmetatable(TestChild, _meta)
-		protos.TestChild = TestChild
-	end
-	do
-		local TestType = {} 
-		local _meta
-		_meta = {
-			fields = {
-				{proto.OPT, proto.int32, 'Fint32', 1, def=1},
-				{proto.OPT, proto.int64, 'Fint64', 2},
-				{proto.OPT, proto.uint32, 'Fuint32', 3},
-				{proto.OPT, proto.uint64, 'Fuint64', 4},
-				{proto.OPT, proto.sint32, 'Fsint32', 5},--zigzag32
-				{proto.OPT, proto.sint64, 'Fsint64', 6},--zigzag64
-				{proto.OPT, proto.fixed32, 'Ffixed32', 7},
-				{proto.OPT, proto.fixed64, 'Ffixed64', 8},
-				{proto.OPT, proto.double, 'Fdouble', 9},
-				{proto.OPT, proto.float, 'Ffloat', 10},
-				{proto.OPT, proto.bool, 'Fbool', 11},
-				{proto.OPT, proto.enum, 'Fenum', 12, enum=protos.TestEnum},
-				{proto.REP, proto.TestChild, 'Frepmessage', 14, message=proto.TestChild},
-				{proto.REP, proto.bool, 'Frepeatbool', 15},
-				{proto.OPT, proto.string, 'Fstring', 16},
-				{proto.OPT, proto.bytes, 'Fbytes', 17},
-				{proto.OPT, proto.sfixed32, 'Fsfixed32', 18},
-				{proto.OPT, proto.sfixed64, 'Fsfixed64', 19},
-				{proto.REP, proto.int32, 'Frepeatint', 20},
-				{proto.REP, proto.bool, 'Frepeatbool2', 21, packed=true},
-				{proto.REP, proto.int32, 'Frepeatint2', 22, packed=true},
-				{proto.REP, proto.string, 'Fstring2', 23},
-				
-				{proto.OPT, proto.TestChild, 'Fmessage', 24, message=proto.TestChild},
-				{proto.REP, proto.TestChild, 'Frepc', 25, message=proto.TestChild},
 
-			},
-			__index = {
-				Marshal = proto.encode,
-				Unmarshal = function(buf)
-					return proto.decode(buf,setmetatable({}, _meta))
-				end,
-			},
-			__call = function(self,t)
-				return setmetatable(t, _meta)
-			end,
-		}
-		setmetatable(TestType, _meta)
-		protos.TestType = TestType
+local protos = {}
+local syntax = "proto2" -- or "proto3" default "proto2"
+setmetatable(proto, {__index=protos})
+do
+	local TestEnum = {
+		MONDAY = 0,
+		SUNDAY = 1,
+	}
+	protos.TestEnum = TestEnum
+end
+do
+	local message = {
+		{proto.OPT, proto.sint64, 'Fsint64',1 },
+	}
+	local fields = {}
+	for _,v in pairs(message) do fields[v[4]] = v end
+	local _meta = {
+		syntax = syntax,
+		message = message,
+		fields = fields,
+	}
+	_meta.__index = {
+		Marshal = proto.encode,
+		Unmarshal = function(buf)
+			return proto.decode(buf, setmetatable({}, _meta))
+		end,
+	}
+	_meta.__call = function(self,t)
+		return setmetatable(t, _meta)
 	end
+	protos.TestChild = setmetatable({}, _meta)
+end
+do
+	local message = {
+		{proto.OPT, proto.int32, 'Fint32', 1, def=1},
+		{proto.OPT, proto.int64, 'Fint64', 2},
+		{proto.OPT, proto.uint32, 'Fuint32', 3},
+		{proto.OPT, proto.uint64, 'Fuint64', 4},
+		{proto.OPT, proto.sint32, 'Fsint32', 5},--zigzag32
+		{proto.OPT, proto.sint64, 'Fsint64', 6},--zigzag64
+		{proto.OPT, proto.fixed32, 'Ffixed32', 7},
+		{proto.OPT, proto.fixed64, 'Ffixed64', 8},
+		{proto.OPT, proto.double, 'Fdouble', 9},
+		{proto.OPT, proto.float, 'Ffloat', 10}, --warning:lua用float通信会损失精度
+		{proto.OPT, proto.bool, 'Fbool', 11},
+		{proto.OPT, proto.enum, 'Fenum', 12, enum=protos.TestEnum},
+		{proto.REP, proto.TestChild, 'Frepmessage', 14},
+		{proto.REP, proto.bool, 'Frepeatbool', 15},
+		{proto.OPT, proto.string, 'Fstring', 16},
+		{proto.OPT, proto.bytes, 'Fbytes', 17},
+		{proto.OPT, proto.sfixed32, 'Fsfixed32', 18},
+		{proto.OPT, proto.sfixed64, 'Fsfixed64', 19},
+		{proto.REP, proto.int32, 'Frepeatint', 20},
+		{proto.REP, proto.bool, 'Frepeatbool2', 21, packed=true},
+		{proto.REP, proto.int32, 'Frepeatint2', 22, packed=true},
+		{proto.REP, proto.string, 'Fstring2', 23},
+		{proto.OPT, proto.TestChild, 'Fmessage', 24},
+		{proto.REP, proto.TestChild, 'Frepc', 25},
+
+	}
+	local fields = {}
+	for _,v in pairs(message) do fields[v[4]] = v end
+	local _meta = {
+		syntax = syntax,
+		message = message,
+		fields = fields,
+	}
+	_meta.__index = {
+		Marshal = proto.encode,
+		Unmarshal = function(buf)
+			return proto.decode(buf, setmetatable({}, _meta))
+		end,
+	}
+	_meta.__call = function(self,t)
+		return setmetatable(t, _meta)
+	end
+	protos.TestType = setmetatable({}, _meta)
+end
 	
 	local b = protos.TestChild{
 			Fsint64 = 123,
 	}:Marshal()
 	print("TestType:",b)
 	local t0 = protos.TestType{
-		Fint32 = 123,
-		Fint64 = 123,
-		Fuint32 = 123,
-		Fuint64 = 123456,
-		Fsint32 = -123,
-		Fsint64 = -123,
-		Ffixed32 = 123,
-		Ffixed64 = 123,
-		Fdouble = -123.123,
-		Ffloat = -123.123,
-		Fbool = true,
-		Fstring = "abcde",
-		Fbytes = 'abc',
-		Fsfixed32 = 1234,
-		Fsfixed64 = 1234,
-		Frepeatbool = {true, false, true},
-		Frepeatbool2 = {true, false, true},
-		Frepeatint = {255, 65536},
-		Frepeatint2 = {255, 65536},
-		Fstring2 = {"abc","bvdd"},
-		Fenum = protos.TestEnum.SUNDAY,
-		Fmessage = protos.TestChild{
-			Fsint64 = 123,
-		},
-		Frepc = {protos.TestChild{
-			Fsint64 = 123,
-		},protos.TestChild{
-			Fsint64 = 234,
-		}},
+		Fint32 = -123,
+		-- Fint64 = 123,
+		-- Fuint32 = 123,
+		-- Fuint64 = 123456,
+		-- Fsint32 = 123,
+		-- Fsint64 = 123456,
+		-- Ffixed32 = -123000000,
+		-- Ffixed64 = -12300000000,
+		-- Fdouble = -12300000000.123,
+		-- Ffloat = 123.123,
+		-- Fbool = true,
+		-- Fbool = false,
+		-- Fstring = "abcde",
+		-- Fbytes = 'abc',
+		-- Fsfixed32 = -123000000,
+		-- Fsfixed64 = -12300000000,
+		-- Frepeatbool = {true, false, true},
+		-- Frepeatbool2 = {true, false, true},
+		-- Frepeatint = {255, 65536},
+		-- Frepeatint2 = {255, 65536},
+		-- Fstring2 = {"abc","bvdd"},
+		-- Fenum = protos.TestEnum.SUNDAY,
+		-- Fmessage = protos.TestChild{
+			-- Fsint64 = 123,
+		-- },
+		-- Frepc = {protos.TestChild{
+			-- Fsint64 = 123,
+		-- },protos.TestChild{
+			-- Fsint64 = 234,
+		-- }},
 		
 	}
 	local b = t0:Marshal()
 	print(#b,"TestType:",b)
-	-- local t = protos.TestType.Unmarshal(b)
-	-- dump(t)
+	local t = protos.TestType.Unmarshal(b)
+	dump(t0)
+	dump(t)
+	for k,v in pairs(t0) do
+		if t[k]~=v then
+			print("not eq:",k)
+		end
+	end
 	
 end
 protobufdev()

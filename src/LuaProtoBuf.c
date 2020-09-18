@@ -33,11 +33,12 @@
 #define PBfixed32 15
 #define PBsfixed32 16
 #define PBfloat 17
+#define PBmessage 18
 
-#define PB_OPT 1 //optional 2
-#define PB_SIG 1 //singular 3
+#define PB_SIG 1 //singular proto3
+#define PB_OPT 1 //optional proto2
 #define PB_REP 2 //repeated
-#define PB_REQ 3 //required 2
+#define PB_REQ 3 //required proto2
 
 #define MAX_CODE_LEN 0xfff0		//max len of code buffer 最大编码长度
 
@@ -59,15 +60,15 @@ static unsigned char SizeVarint(size_t x) {
 		return 3;
 	else if (x < 1 << 28)
 		return 4;
-	else if (x < 1 << 35)
+	else if (x < 1LL << 35)
 		return 5;
-	else if (x < 1 << 42)
+	else if (x < 1LL << 42)
 		return 6;
-	else if (x < 1 << 49)
+	else if (x < 1LL << 49)
 		return 7;
-	else if (x < 1 << 56)
+	else if (x < 1LL << 56)
 		return 8;
-	else if (x < 1 << 63)
+	else if (x < 1LL << 63)
 		return 9;
 	return 10;
 }
@@ -84,7 +85,7 @@ static void EncodeVarint(size_t x, char* buf, size_t* p)
 	buf[(*p)++] = (unsigned char)x;
 }
 
-static void EncodeFieldType(int fn, char wt, char* buf, int* p)
+static void EncodeFieldType(int fn, char wt, char* buf, size_t* p)
 {
 	if (fn < 16)
 		buf[(*p)++] = (fn << 3) + wt;
@@ -92,28 +93,6 @@ static void EncodeFieldType(int fn, char wt, char* buf, int* p)
 		buf[(*p)++] = (fn << 3) | 0x80 + wt;
 		EncodeVarint(fn >> 4, buf, p);
 	}
-}
-// This is the format for the
-// fixed64, sfixed64, and double protocol buffer types.
-static void EncodeFixed64(size_t x, char* buf, size_t* p)
-{
-	buf[(*p)++] = (unsigned char)x;
-	buf[(*p)++] = (unsigned char)(x >> 8);
-	buf[(*p)++] = (unsigned char)(x >> 16);
-	buf[(*p)++] = (unsigned char)(x >> 24);
-	buf[(*p)++] = (unsigned char)(x >> 32);
-	buf[(*p)++] = (unsigned char)(x >> 40);
-	buf[(*p)++] = (unsigned char)(x >> 48);
-	buf[(*p)++] = (unsigned char)(x >> 56);
-}
-// This is the format for the
-// fixed32, sfixed32, and float protocol buffer types.
-static void EncodeFixed32(size_t x, char* buf, size_t* p)
-{
-	buf[(*p)++] = (unsigned char)x;
-	buf[(*p)++] = (unsigned char)(x >> 8);
-	buf[(*p)++] = (unsigned char)(x >> 16);
-	buf[(*p)++] = (unsigned char)(x >> 24);
 }
 // This is the format used for the sint64 protocol buffer type.
 static void EncodeZigzag64(size_t x, char* buf, size_t* p)
@@ -136,7 +115,7 @@ static void EncodeStringBytes(char s[], char* buf, size_t* p)
 	(*p) += len;
 }
 
-static void EncodeBytes(lua_State* L, int idx, int fn, char* buf, int* p)
+static void EncodeBytes(lua_State* L, int idx, int fn, char* buf, size_t* p)
 {
 	size_t len; const char* s = lua_toBytes(L, idx, &len);
 	if (len == 0)return;
@@ -146,19 +125,20 @@ static void EncodeBytes(lua_State* L, int idx, int fn, char* buf, int* p)
 	(*p) += len;
 }
 
-static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
+static size_t encode_tab(lua_State* L, int idx, char *buf)
 {
+	size_t p = 0;
 	if (!lua_istable(L, idx))
 		lua_errorEx(L, "#1 must table for duplicate");
 	lua_getmetatable(L, idx);
+
 	lua_getfield(L, -1, "message"); //meta.fields
-	lua_getfield(L, -2, "syntax"); 
+	lua_getfield(L, -2, "syntax");
 	const char* syntax = lua_tostring(L, -1);
-	int proto2 = syntax==NULL || strcmp(syntax, "proto3");
+	int proto2 = syntax == NULL || strcmp(syntax, "proto3");
 	lua_pop(L, 1);
 	int top = lua_gettop(L);
-	for (int i = 1;; i++, lua_settop(L, top))
-	{
+	for (int i = 1;; i++, lua_settop(L, top)) {
 		lua_rawgeti(L, top, i);//field=fields[i]
 		if (lua_isnil(L, -1)) break;
 
@@ -175,18 +155,18 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 		lua_pop(L, 1);
 
 		lua_getfield(L, top + 1, "packed");
-		int packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1): lua_toboolean(L, -1);
+		int packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
 		lua_pop(L, 1);
 
 		lua_rawgeti(L, top + 1, 3); //field[3] name
-		char* name = lua_tostring(L, -1);
+		const char* name = lua_tostring(L, -1);
 		lua_gettable(L, idx); //t[k]
 
 		int vtp = lua_type(L, -1);
 		//check
 		switch (ktp) {
 		case PB_REQ: //if protobuf2
-			if (vtp == LUA_TNIL) 
+			if (vtp == LUA_TNIL)
 				lua_errorEx(L, "%s required, got nil", name);
 			break;
 		case PB_REP:
@@ -203,48 +183,44 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(char), buf, p); //protobuf2[packed=true] or protobuf3
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(char), buf, &p); //protobuf2[packed=true] or protobuf3
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						int v = lua_toboolean(L, -1);
-						EncodeVarint(v, buf, p);
+						EncodeVarint(v, buf, &p);
 					}
 				}
 				else {
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						int v = lua_toboolean(L, -1);
-						EncodeFieldType(fn, WIRE_VARINT, buf, p);
-						EncodeVarint(v, buf, p);
+						EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+						EncodeVarint(v, buf, &p);
 					}
 				}
 			}
 			else {
 				int v = lua_toboolean(L, -1);
-				EncodeFieldType(fn, WIRE_VARINT, buf, p);
-				EncodeVarint(v, buf, p);
+				EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+				EncodeVarint(v, buf, &p);
 			}
 			break;
 		}
-		case PBint32:
 		case PBint64:
-		case PBuint32:
-		case PBuint64:
-		case PBenum:{
+		case PBuint64: {
 			//TODO check value in lua_getfield(L, top + 1, "enum");
 			if (ktp == PB_REP) {
 				int len = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
 					int Len = 0;
 					for (int j = 1; j <= len; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
-						long long v = (long long)V;
-						Len += SizeVarint(v);
+						Len += SizeVarint((size_t)V);
 					}
-					EncodeVarint(Len, buf, p);
+					EncodeVarint(Len, buf, &p);
 					for (int j = 1; j <= len; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
@@ -252,7 +228,7 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not intX", v);
 
-						EncodeVarint(v, buf, p);
+						EncodeVarint(v, buf, &p);
 					}
 				}
 				else {
@@ -262,9 +238,9 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 						long long v = (long long)V;
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not intX", v);
-						EncodeFieldType(fn, WIRE_VARINT, buf, p);
+						EncodeFieldType(fn, WIRE_VARINT, buf, &p);
 
-						EncodeVarint(v, buf, p);
+						EncodeVarint(v, buf, &p);
 					}
 				}
 			}
@@ -273,36 +249,47 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 				long long v = (long long)V;
 				if (v != (long long)v)
 					lua_errorEx(L, "%d not intX", v);
-				EncodeFieldType(fn, WIRE_VARINT, buf, p);
+				EncodeFieldType(fn, WIRE_VARINT, buf, &p);
 
-				EncodeVarint(v, buf, p);
+				EncodeVarint(v, buf, &p);
 			}
 			break;
 		}
-		case PBsint32: { //PBzigzag32
+		case PBint32:
+		case PBuint32:
+		case PBenum: {
+			//TODO check value in lua_getfield(L, top + 1, "enum");
 			if (ktp == PB_REP) {
-				int size = lua_objlen(L, -1);
+				int len = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(int), buf, p); //protobuf2[packed=true] or protobuf3
-					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					int Len = 0;
+					for (int j = 1; j <= len; j++, lua_pop(L, 1)) {
+						lua_rawgeti(L, -1, j);
+						double V = lua_tonumber(L, -1);
+						Len += SizeVarint((size_t)V);
+					}
+					EncodeVarint(Len, buf, &p);
+					for (int j = 1; j <= len; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
 						if (v != (long long)v)
-							lua_errorEx(L, "%d not FIXED64", v);
-						EncodeZigzag32((size_t)v, buf, p);
+							lua_errorEx(L, "%d not intX", v);
+
+						EncodeVarint(v, buf, &p);
 					}
 				}
 				else {
-					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
+					for (int j = 1; j <= len; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
 						if (v != (long long)v)
-							lua_errorEx(L, "%d not sint32", v);
-						EncodeFieldType(fn, WIRE_VARINT, buf, p);
-						EncodeZigzag32((size_t)v, buf, p);
+							lua_errorEx(L, "%d not intX", v);
+						EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+
+						EncodeVarint(v, buf, &p);
 					}
 				}
 			}
@@ -310,9 +297,47 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 				double V = lua_tonumber(L, -1);
 				long long v = (long long)V;
 				if (v != (long long)v)
-					lua_errorEx(L, "%d not sint32", v);
-				EncodeFieldType(fn, WIRE_VARINT, buf, p);
-				EncodeZigzag32((size_t)v, buf, p);
+					lua_errorEx(L, "%d not intX", v);
+				EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+
+				EncodeVarint(v, buf, &p);
+			}
+			break;
+		}
+		case PBsint32: { //PBzigzag32
+			if (ktp == PB_REP) {
+				int size = lua_objlen(L, -1);
+				if (packed) {
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(int), buf, &p); //protobuf2[packed=true] or protobuf3
+					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
+						lua_rawgeti(L, -1, j);
+						double V = lua_tonumber(L, -1);
+						long long v = (long long)V;
+						if (v != (int)v)
+							lua_errorEx(L, "%f out range of sint32", V);
+						EncodeZigzag32((size_t)v, buf, &p);
+					}
+				}
+				else {
+					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
+						lua_rawgeti(L, -1, j);
+						double V = lua_tonumber(L, -1);
+						long long v = (long long)V;
+						if (v != (int)v)
+							lua_errorEx(L, "%f out range of sint32", V);
+						EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+						EncodeZigzag32((size_t)v, buf, &p);
+					}
+				}
+			}
+			else {
+				double V = lua_tonumber(L, -1);
+				long long v = (long long)V;
+				if (v != (int)v)
+					lua_errorEx(L, "%f out range of sint32", V);
+				EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+				EncodeZigzag32((size_t)v, buf, &p);
 				break;
 			}
 		}
@@ -320,15 +345,15 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(long long), buf, p); //protobuf2[packed=true] or protobuf3
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(long long), buf, &p); //protobuf2[packed=true] or protobuf3
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not sint64", v);
-						EncodeZigzag64((size_t)v, buf, p);
+						EncodeZigzag64((size_t)v, buf, &p);
 					}
 				}
 				else {
@@ -338,8 +363,8 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 						long long v = (long long)V;
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not sint64", v);
-						EncodeFieldType(fn, WIRE_VARINT, buf, p);
-						EncodeZigzag64((size_t)v, buf, p);
+						EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+						EncodeZigzag64((size_t)v, buf, &p);
 					}
 				}
 			}
@@ -348,8 +373,8 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 				long long v = (long long)V;
 				if (v != (long long)v)
 					lua_errorEx(L, "%d not sint64", v);
-				EncodeFieldType(fn, WIRE_VARINT, buf, p);
-				EncodeZigzag64((size_t)v, buf, p);
+				EncodeFieldType(fn, WIRE_VARINT, buf, &p);
+				EncodeZigzag64((size_t)v, buf, &p);
 			}
 			break;
 		}
@@ -358,15 +383,15 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(long long), buf, p); //protobuf2[packed=true] or protobuf3
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(long long), buf, &p); //protobuf2[packed=true] or protobuf3
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not FIXED64", v);
-						EncodeFixed64(v, buf, p);
+						W64(buf + p, v), p += 8;
 					}
 				}
 				else {
@@ -376,8 +401,8 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 						long long v = (long long)V;
 						if (v != (long long)v)
 							lua_errorEx(L, "%d not FIXED64", v);
-						EncodeFieldType(fn, WIRE_FIXED64, buf, p);
-						EncodeFixed64(v, buf, p);
+						EncodeFieldType(fn, WIRE_FIXED64, buf, &p);
+						W64(buf + p, v), p += 8;
 					}
 				}
 			}
@@ -386,8 +411,8 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 				long long v = (long long)V;
 				if (v != (long long)v)
 					lua_errorEx(L, "%d not int or long", v);
-				EncodeFieldType(fn, WIRE_FIXED64, buf, p);
-				EncodeFixed64(v, buf, p);
+				EncodeFieldType(fn, WIRE_FIXED64, buf, &p);
+				W64(buf + p, v), p += 8;
 			}
 			break;
 		}
@@ -395,30 +420,29 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(double), buf, p); //protobuf2[packed=true] or protobuf3
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(double), buf, &p); //protobuf2[packed=true] or protobuf3
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
-						*(double*)(buf + (*p)) = V;
-						(*p) += sizeof(double);
+						*(double*)(buf + p) = V;
+						p += sizeof(double);
 					}
 				}
 				else {
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
-						EncodeFieldType(fn, WIRE_FIXED64, buf, p);
+						EncodeFieldType(fn, WIRE_FIXED64, buf, &p);
 						double V = lua_tonumber(L, -1);
-						*(double*)(buf + (*p)) = V;
-						(*p) += sizeof(double);
+						*(double*)(buf + p) = V;
+						p += sizeof(double);
 					}
 				}
 			}
 			else {
-				EncodeFieldType(fn, WIRE_FIXED64, buf, p);
-				double V = lua_tonumber(L, -1);
-				*(double*)(buf + (*p)) = V;
-				(*p) += sizeof(double);
+				EncodeFieldType(fn, WIRE_FIXED64, buf, &p);
+				double v = lua_tonumber(L, -1);
+				WDb(buf + p, v), p += sizeof(double);
 			}
 			break;
 		}
@@ -427,15 +451,15 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(int), buf, p); //protobuf2[packed=true] or protobuf3
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(int), buf, &p); //protobuf2[packed=true] or protobuf3
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
-						if (v != (long long)v)
-							lua_errorEx(L, "%d not FIXED32", v);
-						EncodeFixed32(v, buf, p);
+						if (v != (int)v)
+							lua_errorEx(L, "%f out range of FIXED32", V);
+						W32(buf + p, v), p += 4;
 					}
 				}
 				else {
@@ -443,20 +467,20 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
 						long long v = (long long)V;
-						if (v != (long long)v)
-							lua_errorEx(L, "%d not FIXED32", v);
-						EncodeFieldType(fn, WIRE_FIXED32, buf, p);
-						EncodeFixed32(v, buf, p);
+						if (v != (int)v)
+							lua_errorEx(L, "%f out range of FIXED32", V);
+						EncodeFieldType(fn, WIRE_FIXED32, buf, &p);
+						W32(buf + p, v), p += 4;
 					}
 				}
 			}
 			else {
 				double V = lua_tonumber(L, -1);
 				long long v = (long long)V;
-				if (v != (long long)v)
-					lua_errorEx(L, "%d not FIXED32", v);
-				EncodeFieldType(fn, WIRE_FIXED32, buf, p);
-				EncodeFixed32(v, buf, p);
+				if (v != (int)v)
+					lua_errorEx(L, "%f out range of FIXED32", V);
+				EncodeFieldType(fn, WIRE_FIXED32, buf, &p);
+				W32(buf + p, v), p += 4;
 			}
 			break;
 		}
@@ -464,86 +488,88 @@ static int encode_tab(lua_State* L, int idx, char *buf, size_t*p)
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				if (packed) {
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(size * sizeof(float), buf, p);
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(size * sizeof(float), buf, &p);
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
-						*(float*)(buf + (*p)) = V;
-						(*p) += sizeof(float);
+						*(float*)(buf + p) = V;
+						p += sizeof(float);
 					}
 				}
 				else {
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
-						EncodeFieldType(fn, WIRE_FIXED32, buf, p);
+						EncodeFieldType(fn, WIRE_FIXED32, buf, &p);
 						double V = lua_tonumber(L, -1);
-						*(float*)(buf + (*p)) = V;
-						(*p) += sizeof(float);
+						*(float*)(buf + p) = V;
+						p += sizeof(float);
 					}
 				}
 			}
 			else {
 				double V = lua_tonumber(L, -1);
 				float v = (float)V;
-				EncodeFieldType(fn, WIRE_FIXED32, buf, p);
-				*(float*)(buf + (*p)) = v; //跟golang byte值一致
-				(*p) += sizeof(float);
+				EncodeFieldType(fn, WIRE_FIXED32, buf, &p);
+				WFl(buf + p, v), p += 4;
 			}
 			break;
 		}
-		case PBstring: {
+		case PBstring: 
+		{
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 					lua_rawgeti(L, -1, j);
 					size_t len; const char* s = lua_tolstring(L, -1, &len);
-					EncodeFieldType(fn, WIRE_BYTES, buf, p);
-					EncodeVarint(len, buf, p);
-					memcpy(buf + *p, s, len);
-					(*p) += len;
+					EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+					EncodeVarint(len, buf, &p);
+					memcpy(buf + p, s, len);
+					p += len;
 				}
 			}
 			else {
 				size_t len; const char* s = lua_tolstring(L, -1, &len);
-				EncodeFieldType(fn, WIRE_BYTES, buf, p);
-				EncodeVarint(len, buf, p);
-				memcpy(buf + *p, s, len);
-				(*p) += len;
+				EncodeFieldType(fn, WIRE_BYTES, buf, &p);
+				EncodeVarint(len, buf, &p);
+				memcpy(buf + p, s, len);
+				p += len;
 			}
 			break;
 		}
 		case PBbytes: {
-			EncodeBytes(L, -1, fn, buf, p);
+			EncodeBytes(L, -1, fn, buf, &p);
 			break;
 		}
-		default:
+		case PBmessage: {
 			if (ktp == PB_REP) {
 				int size = lua_objlen(L, -1);
 				for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 					lua_rawgeti(L, -1, j);
-					lua_getfield(L, -1, "Marshal");
+					lua_getfield(L, -1, "encode");
 					lua_insert(L, -2);
 					lua_call(L, 1, 1);
-					EncodeBytes(L, -1, fn, buf, p);
+					EncodeBytes(L, -1, fn, buf, &p);
 				}
 				break;
 			}
 			else {
 				if (vtp == LUA_TTABLE) {
 					int tt = lua_gettop(L);
-					lua_getfield(L, -1, "Marshal");
+					lua_getfield(L, -1, "encode");
 					lua_insert(L, -2);
 					lua_call(L, 1, 1);
-					EncodeBytes(L, -1, fn, buf, p);
+					EncodeBytes(L, -1, fn, buf, &p);
 					break;
 				}
 			}
+		}
+		default:
 			lua_errorEx(L, "unsurrpot encode vtype %s", lua_typename(L, vtp));
 			break;
 		}
 	}
-	return 0;
+	return p;
 }
 static int lua_proto_encode(lua_State* L)
 {
@@ -553,88 +579,104 @@ static int lua_proto_encode(lua_State* L)
 	int top = lua_gettop(L);
 	//char buf[MAX_CODE_LEN + 1];
 	char *buf = (char*)malloc(MAX_CODE_LEN + 1);
-	size_t len = 0;
-	encode_tab(L, 1, buf, &len);
-	if (len > MAX_CODE_LEN) {
+	if (buf == NULL)
+		lua_errorEx(L, "[C]lua_proto_encode not enough memory");
+
+	size_t len = encode_tab(L, 1, buf);
+	if (len > MAX_CODE_LEN) 
 		lua_errorEx(L, "protobuf encode tolong %d", len);
-	}
+	
 	if (len == 0)return 0;
 	char* buff1 = (char*)lua_newBytes(L, len);
 	memcpy(buff1, buf, len);
 	free(buf);
 	return 1;
 }
+
 /**decode********************************************************/
 
-//0 1010 101 //0是否最后一字节 FN1010 WT101
-//1 0001 101,00000001 //FN1010 WT101
-//varLen BLLLLLLL BXXXXXXX bHHHHHHH B是否有下一字节
-static size_t DecodeVarint(lua_State *L, const char* s, size_t* p, size_t len) {
-	if ((*p) > len)
-		lua_errorEx(L, "ErrUnexpectedEOF");
+static size_t DecodeVarint(lua_State *L, const char* buf, size_t* p) {
 
-	size_t x = (size_t)s[(*p)++]; //first byte
+	size_t x = (size_t)(unsigned char)buf[(*p)++];
 	if (x < 0x80)
 		return x;
 
-	x -= 0x80LL;
-	size_t b = (size_t)(s[(*p)++]);
+	x -= 0x80;
+	size_t b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 7;
 	if (b < 0x80)
 		return x;
 
-	x -= 0x80LL << 7;
-	b = (size_t)(s[(*p)++]);
+	x -= 0x80 << 7;
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 14;
 	if (b < 0x80)
 		return x;
 
-	x -= 0x80LL << 14;
-	b = (size_t)(s[(*p)++]);
+	x -= 0x80 << 14;
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 21;
 	if (b < 0x80)
 		return x;
 
-	x -= 0x80LL << 21;
-	b = (size_t)(s[(*p)++]);
+	x -= 0x80 << 21;
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 28;
 	if (b < 0x80)
 		return x;
 
 	x -= 0x80LL << 28;
-	b = (size_t)(s[(*p)++]);
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 35;
 	if (b < 0x80)
 		return x;
 
 	x -= 0x80LL << 35;
-	b = (size_t)(s[(*p)++]);
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 42;
 	if (b < 0x80)
 		return x;
-
+	
 	x -= 0x80LL << 42;
-	b = (size_t)(s[(*p)++]);
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 49;
 	if (b < 0x80)
 		return x;
-
+	
 	x -= 0x80LL << 49;
-	b = (size_t)(s[(*p)++]);
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 56;
 	if (b < 0x80)
 		return x;
 
 	x -= 0x80LL << 56;
-	b = (size_t)(s[(*p)++]);
+	b = (size_t)(unsigned char)buf[(*p)++];
 	x += b << 63;
-	if (b < 0x80)
+	if (b < 0x80) {
 		return x;
+	}
 
 	lua_errorEx(L, "ErrOverflow");
+	return 0;
 }
 
-static DecodeFieldType(char* buf, int* p, int *fn, int*wt)
+// This is the format used for the sint64 protocol buffer type.
+static size_t DecodeZigzag64(lua_State* L, const char* s, size_t* p)
+{
+	size_t x = DecodeVarint(L, s, p);
+	x = (x >> 1) ^ (size_t)(((long long)(x & 1) << 63) >> 63);
+	return x;
+}
+
+// This is the format used for the sint32 protocol buffer type.
+static size_t DecodeZigzag32(lua_State* L, const char* s, size_t* p) 
+{
+	size_t x = DecodeVarint(L, s, p);
+	x = (size_t)(((unsigned)(x) >> 1) ^ (unsigned)(((int)(x & 1) << 31) >> 31));
+	return x;
+}
+
+static void DecodeFieldType(const char* buf, size_t* p, int *fn, int*wt)
 {
 	unsigned char c = buf[(*p)++];
 	*wt = c & 0x7;
@@ -649,140 +691,206 @@ static DecodeFieldType(char* buf, int* p, int *fn, int*wt)
 		*fn = (c & 0x78) >> 3;
 }
 
+static void DecodePushFieldVal(lua_State* L, int tp, const char *buf, size_t*p)
+{
+	size_t V;
+	switch (tp) {
+	case PBbool: {
+		int b = (unsigned int)buf[(*p)++];
+		lua_pushboolean(L, b);
+		break;
+	}
+	case PBint32: {
+		V = DecodeVarint(L, buf, p);
+		lua_pushnumber(L, (int)V);
+		break;
+	}
+	case PBint64: {
+		V = DecodeVarint(L, buf, p);
+		lua_pushnumber(L, (long long)V);
+		break;
+	}
+	case PBuint32: {
+		V = DecodeVarint(L, buf, p);
+		lua_pushnumber(L, (unsigned)V);
+		break;
+	}
+	case PBuint64: 
+	case PBenum: {
+		V = DecodeVarint(L, buf, p);
+		lua_pushnumber(L, V);
+		break;
+	}
+	case PBsint32:
+		V = DecodeZigzag32(L, buf, p);
+		lua_pushnumber(L, (int)V);
+		break;
+	case PBsint64: {
+		V = DecodeZigzag64(L, buf, p);
+		lua_pushnumber(L, (long long)V);
+		break;
+	}
+	case PBfixed32:
+	case PBsfixed32: {
+		int v = R32(buf + *p);
+		lua_pushnumber(L, v);
+		*p += sizeof(int);
+		break;
+	}
+	case PBfixed64:
+	case PBsfixed64: {
+		long long v = R64(buf + *p);
+		lua_pushnumber(L, v);
+		*p += sizeof(long long);
+		break;
+	}
+	case PBdouble: {
+		double v = RDb(buf + *p);
+		lua_pushnumber(L, v);
+		*p += sizeof(double);
+		break;
+	}
+	case PBfloat: { //encode时double转float, decode时float tonumber会有损失精度
+		float v = RFl(buf + *p);
+		lua_pushnumber(L, v);
+		*p += sizeof(float);
+		break;
+	}
+	case PBstring: {
+		V = DecodeVarint(L, buf, p);
+		lua_pushlstring(L, buf + *p, V);
+		*p += V;
+		break;
+	}
+	case PBbytes: {
+		V = DecodeVarint(L, buf, p);
+		char* ub = lua_newBytes(L, V);
+		memcpy(ub, buf + *p, V);
+		*p += V;
+		break;
+	}
+	case PBmessage: {
+		V = DecodeVarint(L, buf, p);
+		lua_getfield(L, 5, "msg");
+		lua_getfield(L, -1, "decode");
+		lua_replace(L, -2);
+		char* u = lua_newBytes(L, V); //TODO lua_pushlightuserdata(L, val);
+		memcpy(u, buf + *p, V);
+		lua_call(L, 1, 1);
+		*p += V;
+		break;
+	}
+	default:
+		lua_errorEx(L, "undefined proto type %d", tp);
+		return;
+	}
+}
+
 static int lua_proto_decode(lua_State* L)
 {
 	//L1: buf
 	size_t len;
-	const char* s = lua_toBytes(L, 1, &len);
+	const char* buf = lua_toBytes(L, 1, &len);
 	//L2: ret table
 	//L3: metatable
 	lua_getmetatable(L, 2);
 	//L4: metatable.fields
 	lua_getfield(L, -1, "fields");
+
 	lua_getfield(L, -2, "syntax");
 	const char* syntax = lua_tostring(L, -1);
 	int proto2 = syntax == NULL || strcmp(syntax, "proto3");
 	lua_pop(L, 1);
 
-	size_t p = 0;
 	int fn = 0;	//feild number
 	int wt;	//wire type
-	size_t varLen;
-	char* val;
 	int top = lua_gettop(L);
-	while (p < len) {
-		DecodeFieldType(s, &p, &fn, &wt);
-		lua_rawgeti(L, 4, fn);//field=fields[i]
+	for (size_t p = 0; p < len; lua_settop(L, top)) {
+		DecodeFieldType(buf, &p, &fn, &wt);
+		lua_rawgeti(L, 4, fn);//L5 field=fields[i]
 		if (lua_isnil(L, -1))
-			lua_errorEx(L, "undefined field %d", fn);
+			lua_errorEx(L, "undefined field idx: %d", fn);
 
-		lua_rawgeti(L, top + 1, 1);//field[1] fieldtype
+		lua_rawgeti(L, 5, 1);//field[1] fieldtype
 		int ktp = lua_tointeger(L, -1);
 		lua_pop(L, 1);
 
-		lua_rawgeti(L, top + 1, 2);//field[2] TP
+		lua_rawgeti(L, 5, 2);//field[2] TP
 		int tp = lua_tointeger(L, -1);
 		lua_pop(L, 1);
 
-		lua_getfield(L, top + 1, "packed");
+		lua_getfield(L, 5, "packed");
 		int packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
 		lua_pop(L, 1);
 
-		lua_rawgeti(L, top + 1, 3); //field[3] name
-		char* name = lua_tostring(L, -1);
-
+		lua_rawgeti(L, 5, 3); //L 6 field[3] name
 		if (ktp == PB_REP) {
-			lua_createtable(L, 4, 0);
 			if (packed) {
-
+				int plen = DecodeVarint(L, buf, &p);
+				size_t oldp = p;
+				lua_createtable(L, plen, 0); //new arr
+				for (int i = 1; p - oldp < plen; i++) {
+					DecodePushFieldVal(L, tp, buf, &p);
+					lua_rawseti(L, -2, i); //arr[++]=val
+				}
+				lua_settable(L, 2); //t[name]=arr
 			}
 			else {
+				lua_gettable(L, 2);
+				if (!lua_istable(L, -1)) {
+					lua_rawgeti(L, 5, 3);
 
+					lua_createtable(L, 4, 0); //new arr
+					DecodePushFieldVal(L, tp, buf, &p);
+					lua_rawseti(L, -2, 1); //arr[1]=val
+
+					lua_settable(L, 2);//t[name]=arr
+				}
+				else {
+					int i = lua_objlen(L, -1);
+					DecodePushFieldVal(L, tp, buf, &p);
+					lua_rawseti(L, -2, ++i); //arr[+]=val
+					lua_pop(L, 1); //pop arr
+				}
 			}
-			lua_settable(L, 2);
 		}
 		else {
-
-		}
-
-		switch (tp) {
-		case PBbool: {
-			int b = (unsigned int)s[p++];
-			lua_pushboolean(L, b);
+			DecodePushFieldVal(L, tp, buf, &p);
 			lua_settable(L, 2);
-			break;
 		}
-		case PBint32:
-		case PBint64:
-		case PBuint32:
-		case PBuint64:
-		case PBenum:{
-			varLen = DecodeVarint(L, s, &p, len);
-
-			break;
-		}
-		case PBsint32:
-		case PBsint64: {
-
-			break;
-		}
-		case PBfixed64:
-		case PBsfixed64: {
-			long long v = R64(s + p);
-			lua_pushnumber(L, v);
-			lua_settable(L, 2);
-			p += sizeof(long long);
-			break;
-		}
-		case PBdouble: {
-			double v = RDb(s + p);
-			lua_pushnumber(L, v);
-			lua_settable(L, 2);
-			p += sizeof(double);
-			break;
-		}
-		case PBfixed32:
-		case PBsfixed32: {
-			int v = R32(s + p);
-			lua_pushnumber(L, v);
-			lua_settable(L, 2);
-			p += sizeof(int);
-			break;
-		}
-		case PBfloat: { //encode时double转float, decode时float tonumber会有损失精度
-			float v = RFl(s + p);
-			double V = (double)v;
-			lua_pushnumber(L, V);
-			lua_settable(L, 2);
-			p += sizeof(float);
-			break;
-		}
-		case PBstring: {
-			varLen = DecodeVarint(L, s, &p, len);
-			lua_pushlstring(L, s + p, varLen);
-			lua_settable(L, 2);
-			p += varLen;
-			break;
-		}
-		case PBbytes: {
-			varLen = DecodeVarint(L, s, &p, len);
-			char *ub = lua_newBytes(L, varLen);
-			memcpy(ub, s + p, varLen);
-			lua_settable(L, 2);
-			p += varLen;
-			break;
-		}
-		default: {
-
-			break;
-		}
-		}
-		lua_settop(L, top);
 	}
 	lua_settop(L, 2);
 	return 1;
 }
 
+static int lua_proto_code(lua_State* L) 
+{
+
+}
+
+//--syntax = "proto3" or "proto2"
+//function proto.package(syntax)
+//	return setmetatable({}, { __newindex = function(self, name, message)
+//		local fields = {}
+//		for _,v in pairs(message) do fields[v[4]] = v end
+//		local _meta = {name = name,syntax = syntax, message = message, fields = fields}
+//		_meta.__index = {
+//			encode = proto.encode,
+//			decode = function(buf)
+//				print("decode:",name)
+//				return proto.decode(buf, setmetatable({}, _meta))
+//			end,
+//		}
+//		_meta.__call = function(self,t)
+//			return setmetatable(t, _meta)
+//		end
+//		rawset(self, name, setmetatable({}, _meta))
+//	end })
+//end
+static int lua_proto_package(lua_State* L)
+{
+
+}
 
 LUA_API void luaopen_protobuf(lua_State* L)
 {
@@ -830,6 +938,9 @@ LUA_API void luaopen_protobuf(lua_State* L)
 	lua_setfield(L, -2, "sfixed32");
 	lua_pushinteger(L, PBfloat);
 	lua_setfield(L, -2, "float");
+	lua_pushinteger(L, PBmessage);
+	lua_setfield(L, -2, "message");
+
 	lua_pushinteger(L, PB_OPT);
 	lua_setfield(L, -2, "OPT");
 	lua_pushinteger(L, PB_REP);

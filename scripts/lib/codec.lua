@@ -79,50 +79,51 @@ _G._callout = _callout or function(o,onCallout)
 end
 --]]
 
-function protoc(package, files)
+function proto.protoc(package, files)
 
 
+end
+--syntax="proto3" or "proto2"
+function proto.package(syntax)
+
+	return setmetatable({}, {__newindex = function(self, name, message)
+		local fields = {} 
+		for _,v in pairs(message) do fields[v[4]] = v end
+		local _meta = {name=name,syntax = syntax, message = message, fields = fields}
+		_meta.__index = {
+			encode = proto.encode,
+			decode = function(buf)
+				print("decode:",name)
+				return proto.decode(buf, setmetatable({}, _meta))
+			end,
+		}
+		_meta.__call = function(self,t)
+			return setmetatable(t, _meta)
+		end
+		rawset(self, name, setmetatable({}, _meta))
+	end})
 end
 
 function protobufdev()
 	assert(proto,'proto required')
 	dump(proto)
+	
 
-local protos = {}
-local syntax = "proto2" -- or "proto3" default "proto2"
-setmetatable(proto, {__index=protos})
-do
+	local syntax = "proto2"
+	local protos = proto.package(syntax)
+
 	local TestEnum = {
 		MONDAY = 0,
 		SUNDAY = 1,
 	}
-	protos.TestEnum = TestEnum
-end
-do
-	local message = {
+	rawset(protos,"TestEnum",TestEnum)
+	
+	protos.TestChild = {
 		{proto.OPT, proto.sint64, 'Fsint64',1 },
 	}
-	local fields = {}
-	for _,v in pairs(message) do fields[v[4]] = v end
-	local _meta = {
-		syntax = syntax,
-		message = message,
-		fields = fields,
-	}
-	_meta.__index = {
-		Marshal = proto.encode,
-		Unmarshal = function(buf)
-			return proto.decode(buf, setmetatable({}, _meta))
-		end,
-	}
-	_meta.__call = function(self,t)
-		return setmetatable(t, _meta)
-	end
-	protos.TestChild = setmetatable({}, _meta)
-end
-do
-	local message = {
-		{proto.OPT, proto.int32, 'Fint32', 1, def=1},
+	
+	protos.TestType = {
+		{proto.OPT, proto.int32, 'Fint32', 1},
 		{proto.OPT, proto.int64, 'Fint64', 2},
 		{proto.OPT, proto.uint32, 'Fuint32', 3},
 		{proto.OPT, proto.uint64, 'Fuint64', 4},
@@ -131,10 +132,10 @@ do
 		{proto.OPT, proto.fixed32, 'Ffixed32', 7},
 		{proto.OPT, proto.fixed64, 'Ffixed64', 8},
 		{proto.OPT, proto.double, 'Fdouble', 9},
-		{proto.OPT, proto.float, 'Ffloat', 10}, --warning:lua用float通信会损失精度
+		{proto.OPT, proto.float, 'Ffloat', 10}, --warning:lua用float通信会损失精度,建议浮点都用double
 		{proto.OPT, proto.bool, 'Fbool', 11},
-		{proto.OPT, proto.enum, 'Fenum', 12, enum=protos.TestEnum},
-		{proto.REP, proto.TestChild, 'Frepmessage', 14},
+		{proto.OPT, proto.enum, 'Fenum', 12, enum=TestEnum},
+		{proto.REP, proto.message, 'Frepmessage', 14, msg=protos.TestChild},
 		{proto.REP, proto.bool, 'Frepeatbool', 15},
 		{proto.OPT, proto.string, 'Fstring', 16},
 		{proto.OPT, proto.bytes, 'Fbytes', 17},
@@ -144,44 +145,26 @@ do
 		{proto.REP, proto.bool, 'Frepeatbool2', 21, packed=true},
 		{proto.REP, proto.int32, 'Frepeatint2', 22, packed=true},
 		{proto.REP, proto.string, 'Fstring2', 23},
-		{proto.OPT, proto.TestChild, 'Fmessage', 24},
-		{proto.REP, proto.TestChild, 'Frepc', 25},
-
+		{proto.OPT, proto.message, 'Fmessage', 24, msg=protos.TestChild},
+		{proto.REP, proto.message, 'Frepc', 25, msg=protos.TestChild},
 	}
-	local fields = {}
-	for _,v in pairs(message) do fields[v[4]] = v end
-	local _meta = {
-		syntax = syntax,
-		message = message,
-		fields = fields,
-	}
-	_meta.__index = {
-		Marshal = proto.encode,
-		Unmarshal = function(buf)
-			return proto.decode(buf, setmetatable({}, _meta))
-		end,
-	}
-	_meta.__call = function(self,t)
-		return setmetatable(t, _meta)
-	end
-	protos.TestType = setmetatable({}, _meta)
-end
 	
 	local b = protos.TestChild{
-			Fsint64 = 123,
-	}:Marshal()
+		Fsint64 = 123,
+	}:encode()
 	print("TestType:",b)
 	local t0 = protos.TestType{
-		Fint32 = -123,
-		-- Fint64 = 123,
-		-- Fuint32 = 123,
-		-- Fuint64 = 123456,
-		-- Fsint32 = 123,
-		-- Fsint64 = 123456,
+		-- Fint32 = -2100000000,
+		-- Fint64 = -123000000000,
+		-- Fuint32 = 4100000000,
+		-- Fuint64 = 123000000000,
+		-- Fsint32 = -123000000,
+		-- Fsint64 = 123000000000,
+		
 		-- Ffixed32 = -123000000,
-		-- Ffixed64 = -12300000000,
-		-- Fdouble = -12300000000.123,
-		-- Ffloat = 123.123,
+		-- Ffixed64 = 12300000000,
+		Fdouble = math.pi, 
+		Ffloat = math.pi,
 		-- Fbool = true,
 		-- Fbool = false,
 		-- Fstring = "abcde",
@@ -204,9 +187,9 @@ end
 		-- }},
 		
 	}
-	local b = t0:Marshal()
+	local b = t0:encode()
 	print(#b,"TestType:",b)
-	local t = protos.TestType.Unmarshal(b)
+	local t = protos.TestType.decode(b)
 	dump(t0)
 	dump(t)
 	for k,v in pairs(t0) do

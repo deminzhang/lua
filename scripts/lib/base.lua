@@ -27,7 +27,7 @@ if os.info.system == 'windows' then
 		dir = dir or ''
 		local dirs = {}
 		local files = {}
-		local p = ''
+		local p = ' '
 		if subdir then p = ' /s' end
 		for name in io.popen('@dir /ad-h/b "' .. dir ..'"'..p):lines() do
 			--print(name)

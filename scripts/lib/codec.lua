@@ -79,16 +79,14 @@ _G._callout = _callout or function(o,onCallout)
 end
 --]]
 
-function proto.protoc(package, files)
-	local f = io.open('proto/test2.proto','rb')
-	local t = f:read("*a")
-	f:close()
-	local n = 0
-	t = [[-------------------------------
+--protoc.exe --lua_out=. ../protocol/*.proto  --proto_path=../protocol/
+function proto.protoc(lua_out, proto_path)
+	
+	local pk = [[----------------------------------------
 local proto = proto
-local OPT = proto.OPT
-local REP = proto.REP
-local REQ = proto.REQ
+local OPT  = proto.OPT 
+local REQ  = proto.REQ 
+local REP  = proto.REP 
 local bool  = proto.bool 
 local enum  = proto.enum 
 local int32 = proto.int32
@@ -96,72 +94,105 @@ local int64 = proto.int64
 local uint32 = proto.uint32
 local uint64 = proto.uint64
 local sint32  = proto.sint32 
-local zigzag32  = proto.zigzag32 
-local zigzag64  = proto.zigzag64 
+local sint64  = proto.sint64 
+local fixed32  = proto.fixed32 
 local fixed64  = proto.fixed64 
+local sfixed32  = proto.sfixed32 
 local sfixed64  = proto.sfixed64 
 local double  = proto.double 
 local string  = proto.string 
 local bytes  = proto.bytes 
-local fixed32  = proto.fixed32 
 local float  = proto.float 
-local message  = proto.message 
-local map  = proto.map 
-
-]]..t
-	t,n = string.gsub(t,"//(.-)\n","--%1\n") --comment
-	t,n = string.gsub(t,"Anytax%s*=%s*(%w+);","local syntax = %2") --syntax
-	t,n = string.gsub(t,"syntax%s*=%s*(%w+);","local syntax = %2") --syntax
-	t,n = string.gsub(t,"package%s+(%w+)%s*;","local _pb = proto.package(syntax)") --package
-	t,n = string.gsub(t,"import%s+\"(%w+)%.proto\";","local %1 = require\"proto.%1\"") --import TODO
-	
-	-- repeat --嵌套message 提到local
-	-- t,n = string.gsub(t,"(message%s*%w+%s*{.-)(message%s*%w+%s*{.-})(.-})", "%2\n%1%3") 
-	-- until n==0
-	
-	t,n = string.gsub(t,"enum%s*(%w+)%s*{(.-)}","local %1 = _pb:enum('%1',{%2})") --enum
-	t,n = string.gsub(t,"message%s*(%w+)%s*{(.-)}","local %1 = _pb:message('%1',{%2})") --message
-	t,n = string.gsub(t,"(%w+%.?%w+)%s+(%w+)%s*=%s*(%d+)%s*%[(.+)%]%s*;","{OPT, %1, %2, %3, %4},")--field[packed=,default=]
-	t,n = string.gsub(t,"(%w+%.?%w+)%s+(%w+)%s*=%s*(%d+)%s*;","{OPT, %1, %2, %3},")--field
-	t,n = string.gsub(t,"map<(%w+),(%w+)>%s*(%w+)%s*=%s*(%d+)%s*;","{OPT, map, %3, %4, map={%1,%2},},") --map field
-	t,n = string.gsub(t,"(required%s*{OPT)","{REQ") --assert(proto2
-	t,n = string.gsub(t,"(optional","")				--if proto3
-	t,n = string.gsub(t,"(repeated%s*{OPT)","{REP")
-	t,n = t.."\nreturn _pb"
-	t = '-------------------------------'..t
-	print(t,n)
+local _map  = proto.Map 
+----------------------------------------
+%s
+return _pb
+]]
+	dump(io.list(proto_path))
+	for _, fn in pairs(io.list(proto_path)) do
+		local ff = fn:gmatch('(%w+)%.proto')()
+		if ff then
+			local f = io.open(proto_path..'/'..fn,'rb')
+			local t = f:read("*a")
+			f:close()
+			local n = 0
+			local fw = io.open('proto/'..ff..'.lua','wb')
+			t,n = t:gsub("//(.-)\r\n","--%1\r\n") --comment
+			repeat
+				t,n = t:gsub("(\r\n\r\n\r\n)","\r\n\r\n")
+			until n==0
+			local syntax = t:gmatch("syntax%s*=%s*\"(%w+)\"%s*;")() or 'proto2'
+			if syntax=='proto3' then
+				if t:gmatch('%[(default%s*=)')() then
+					error('Explicit default values are not allowed in proto3')
+				end
+			end
+			local packname = t:gmatch('package%s+([%w_]+)%s*;')() or 'protos'
+			
+			t,n = t:gsub('syntax%s*=%s*(\"%w+\")%s*;',"local syntax = %1") --syntax
+			t,n = t:gsub('package%s+([%w_]+)%s*;','local _pb = proto.package(\"%1\",syntax)')
+			t,n = t:gsub('import%s+\"([%w_]+)%.proto\";','local %1 = proto.import\"proto.%1\"') --import TODO
+			
+			-- repeat --嵌套message 提到local
+			-- t,n = t:gsub('(message%s*[%w_]+%s*{.-)(message%s*[%w_]+%s*{.-})(.-})', '%2\n%1%3') 
+			-- until n==0
+			
+			t,n = t:gsub('enum%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\n_pb.enum.%1 = %1')
+			t,n = t:gsub('message%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\n_pb.message.%1 = %1')
+			t,n = t:gsub('([%w_]+%.?[%w_]+)%s+([%w_]+)%s*=%s*(%d+)%s*%[(.-)%]%s*;','{OPT, %1, \"%2\", %3, %4},')
+			t,n = t:gsub('([%w_]+%.?[%w_]+)%s+([%w_]+)%s*=%s*(%d+)%s*;','{OPT, %1, \"%2\", %3},')
+			t,n = t:gsub('map<(%w+),([%w_]+)>%s*([%w_]+)%s*=%s*(%d+)%s*;','{OPT, _map(%1,%2), \"%3\", %4},')
+			t,n = t:gsub('(required%s*{OPT)','{REQ')
+			t,n = t:gsub('(optional','')
+			t,n = t:gsub('(repeated%s*{OPT)','{REP')
+			t = pk:format(t)
+			fw:write(t)
+			fw:close()
+		end
+	end
 	
 end
 
+
+function proto.import(pname)
+	
+end
 -- if proto.package==nil then
-function proto.package(syntax)
-	local pack = {}
+function proto.package(pname, syntax)
+	local pack = proto.loaded[pname]
+	if pack then return pack end
+	pack = {}
+	proto.loaded[pname] = pack
 	return setmetatable(pack, {
 		__index = {
-			enum = function(self, name, enum)
+			enum = setmetatable({},{__newindex=function(self, name, enum)
 				local value = {}
 				for k,v in pairs(enum) do
-					assert(value[v]==nil,name.." duplicated enum value:"..v)
-					value[v] = k 
+					assert(value[v]==nil,name..' duplicated enum value:'..v)
+					assert(math.floor(v)==v, name..' enum value must be int32'..v)
+					value[v] = k
 				end
-				setmetatable(enum,{__index={pbtype = proto.enum, value=value}})
-				rawset(self,name,enum)
+				local enum_meta = {__index={pbtype = proto.enum, syntax = syntax, value=value}}
+				setmetatable(enum,enum_meta)
+				rawset(pack,name,enum)
 				return enum
-			end,
-			message = function(self, name, msg)
+			end}),
+			message = setmetatable({},{__newindex=function(self, name, msg)
 				local fields = {} 
 				for _,v in pairs(msg) do
 					local flab = v[1]
 					local ftp = v[2]
 					if type(ftp)=='table' then
+						assert(ftp.pbtype~=proto.message or syntax==ftp.syntax, 'sub message syntax必须相同')
 						ftp = ftp.pbtype
 					end
 					local fname = v[3]
 					local fn = v[4]
-					assert(fields[fn]==nil,name.." duplicated field:"..fn)
+					assert(fields[fn]==nil,name..' duplicated field:'..fn)
+					
 					if syntax=='proto3' then
 						assert(v[1]==proto.OPT or v[1]==proto.REP, 'proto3 unsupported '..fname)
-						assert(v.default==nil,"[default] proto3 unsupported")
+						assert(v.default==nil,'[default] proto3 unsupported')
 					end
 					if ftp==proto.map and flab~=proto.OPT then
 						error('Field labels are not allowed on map fields')
@@ -171,24 +202,21 @@ function proto.package(syntax)
 					end
 					fields[fn] = v 
 				end
-				local _meta = {name=name,syntax = syntax, message = msg, fields = fields}
-				_meta.__index = {
+				local message_meta = { syntax = syntax, message = msg, fields = fields}
+				message_meta.__index = {
+					syntax = syntax,
 					pbtype = proto.message,
 					encode = proto.encode,
 					decode = function(buf)
-						print("decode:",name)
-						return proto.decode(buf, setmetatable({}, _meta))
+						return proto.decode(buf, setmetatable({}, message_meta))
 					end,
 				}
-				_meta.__call = function(self,t)
-					return setmetatable(t, _meta)
+				message_meta.__call = function(self,t)
+					return setmetatable(t, message_meta)
 				end
-				local m = {}
-				if name~='_' then
-					rawset(self, name, m)
-				end
-				return setmetatable(m, _meta)
-			end,
+				rawset(pack,name,msg)
+				return setmetatable(msg, message_meta)
+			end}),
 		}
 	})
 end
@@ -199,94 +227,117 @@ function protobufdev()
 	dump(proto)
 	local t = {}
 	
-	local fs = proto.protoc('test2.proto', file)
+	local fs = proto.protoc('proto/', 'proto/')
 	----------------------------------------------------
-	local syntax = "proto2"
-	local _pb = proto.package(syntax)
-	local map = function(ktp,vtp)
-		return setmetatable({ktp,vtp},{__index={pbtype = proto.map}})
-	end
+	local proto = proto
+	local OPT = proto.OPT
+	local REP = proto.REP
+	local REQ = proto.REQ
+	local bool  = proto.bool 
+	local enum  = proto.enum 
+	local int32 = proto.int32
+	local int64 = proto.int64
+	local uint32 = proto.uint32
+	local uint64 = proto.uint64
+	local sint32  = proto.sint32 
+	local sint64  = proto.sint64 
+	local fixed32  = proto.fixed32 
+	local fixed64  = proto.fixed64 
+	local sfixed32  = proto.sfixed32 
+	local sfixed64  = proto.sfixed64 
+	local double  = proto.double 
+	local string  = proto.string 
+	local bytes  = proto.bytes 
+	local float  = proto.float 
+	
+	local syntax = "proto3"
+	local _pb = proto.package('test2',syntax)
+	--local common = proto.import('common.proto')
 
-	local TestEnum = _pb:enum("TestEnum",{
+	local TestEnum = {
 		MONDAY = 0,
 		SUNDAY = 1,
-	})
+	}
+	_pb.enum.TestEnum = TestEnum
 	
-	local TestChild = _pb:message("TestChild",{
-		{proto.OPT, proto.sint64, 'Fsint64',1 },
-	})
+	local TestChild = {
+		{OPT, sint64, 'Fsint64',1 },
+		{OPT, sint64, 'Fsint64',2 },
+	}
+	_pb.message.TestChild = TestChild
 	
-	local TestType = _pb:message("TestType",{
-		{proto.OPT, proto.int32, 'Fint32', 1},
-		{proto.OPT, proto.int64, 'Fint64', 2},
-		{proto.OPT, proto.uint32, 'Fuint32', 3},
-		{proto.OPT, proto.uint64, 'Fuint64', 4},
-		{proto.OPT, proto.sint32, 'Fsint32', 5},--zigzag32
-		{proto.OPT, proto.sint64, 'Fsint64', 6},--zigzag64
-		{proto.OPT, proto.fixed32, 'Ffixed32', 7},
-		{proto.OPT, proto.fixed64, 'Ffixed64', 8},
-		{proto.OPT, proto.double, 'Fdouble', 9},
-		{proto.OPT, proto.float, 'Ffloat', 10}, --warning:lua用float通信会损失精度,建议浮点都用double
-		{proto.OPT, proto.bool, 'Fbool', 11},
-		{proto.OPT, TestEnum, 'Fenum', 12},
-		{proto.OPT, map(proto.int64,proto.int32), 'Fmap', 13},
-		{proto.REP, TestChild, 'Frepmessage', 14},
-		{proto.REP, proto.bool, 'Frepeatbool', 15},
-		{proto.OPT, proto.string, 'Fstring', 16},
-		{proto.OPT, proto.bytes, 'Fbytes', 17},
-		{proto.OPT, proto.sfixed32, 'Fsfixed32', 18},
-		{proto.OPT, proto.sfixed64, 'Fsfixed64', 19},
-		{proto.REP, proto.int32, 'Frepeatint', 20},
-		{proto.REP, proto.bool, 'Frepeatbool2', 21},
-		{proto.REP, proto.int32, 'Frepeatint2', 22},
-		{proto.REP, proto.string, 'Fstring2', 23},
-		{proto.OPT, TestChild, 'Fmessage', 24},
-		{proto.REP, TestChild, 'Frepc', 25},
-	})
+	local TestType = {
+		{OPT, int32, 'Fint32', 1},
+		{OPT, int64, 'Fint64', 2},
+		{OPT, uint32, 'Fuint32', 3},
+		{OPT, uint64, 'Fuint64', 4},
+		{OPT, sint32, 'Fsint32', 5},
+		{OPT, sint64, 'Fsint64', 6},
+		{OPT, fixed32, 'Ffixed32', 7},
+		{OPT, fixed64, 'Ffixed64', 8},
+		{OPT, double, 'Fdouble', 9},
+		{OPT, float, 'Ffloat', 10}, --warning:lua用float通信会损失精度,建议浮点都用double
+		{OPT, bool, 'Fbool', 11},
+		{OPT, TestEnum, 'Fenum', 12},
+		{OPT, proto.Map(int64,int32), 'Fmap', 13},
+		{REP, TestChild, 'Frepmessage', 14},
+		{REP, bool, 'Frepeatbool', 15},
+		{OPT, string, 'Fstring', 16},
+		{OPT, bytes, 'Fbytes', 17},
+		{OPT, sfixed32, 'Fsfixed32', 18},
+		{OPT, sfixed64, 'Fsfixed64', 19},
+		{REP, int32, 'Frepeatint', 20},
+		{REP, bool, 'Frepeatbool2', 21},
+		{REP, int32, 'Frepeatint2', 22},
+		{REP, string, 'Fstring2', 23},
+		{OPT, TestChild, 'Fmessage', 24},
+		{REP, TestChild, 'Frepc', 25},
+	}
+	_pb.message.TestType = TestType
 	
 	------------------------------------------
-	
-	local b = _pb.TestChild{
+	local protos = _pb
+	local b = protos.TestChild{
 		Fsint64 = 123,
 	}:encode()
 	print("TestType:",b)
-	local t0 = _pb.TestType{
-		-- Fint32 = -2100000000,
-		-- Fint64 = -123000000000,
-		-- Fuint32 = 4100000000,
-		-- Fuint64 = 123000000000,
-		-- Fsint32 = -123000000,
-		-- Fsint64 = 123000000000,
+	local t0 = protos.TestType{
+		Fint32 = -2100000000,
+		Fint64 = -123000000000,
+		Fuint32 = 4100000000,
+		Fuint64 = 123000000000,
+		Fsint32 = -123000000,
+		Fsint64 = 123000000000,
 		
-		-- Ffixed32 = -123000000,
-		-- Ffixed64 = 12300000000,
-		-- Fdouble = math.pi, 
-		-- Ffloat = math.pi,
-		-- Fbool = true,
-		-- Fbool = false,
+		Ffixed32 = -123000000,
+		Ffixed64 = 12300000000,
+		Fdouble = math.pi, 
+		Ffloat = math.pi,
+		Fbool = true,
+		Fbool = false,
 		Fstring = "abcde",
-		-- Fbytes = 'abc',
-		-- Fsfixed32 = -123000000,
-		-- Fsfixed64 = -12300000000,
+		Fbytes = 'abc',
+		Fsfixed32 = -123000000,
+		Fsfixed64 = -12300000000,
 		-- Frepeatbool = {true, false, true},
 		-- Frepeatbool2 = {true, false, true},
 		-- Frepeatint = {255, 65536},
 		-- Frepeatint2 = {255, 65536},
-		Fstring2 = {"abc","bvdd"},
-		-- Fenum = _pb.TestEnum.SUNDAY,
-		-- Fmessage = _pb.TestChild{
+		-- Fstring2 = {"abc","abcd"},
+		-- Fenum = protos.TestEnum.SUNDAY,
+		-- Fmessage = protos.TestChild{
 			-- Fsint64 = 123,
 		-- },
-		-- Frepc = {_pb.TestChild{
+		-- Frepc = {protos.TestChild{
 			-- Fsint64 = 123,
-		-- },_pb.TestChild{
+		-- },protos.TestChild{
 			-- Fsint64 = 234,
 		-- }},
-		-- Fmap = {[3]=7,[6]=5},
+		Fmap = {[3]=7,[6]=5},
 	}
 	local b = t0:encode()
 	print(#b,"TestType:",b)
-	local t = _pb.TestType.decode(b)
+	local t = protos.TestType.decode(b)
 	dump(t0)
 	dump(t)
 	for k,v in pairs(t0) do
@@ -294,6 +345,7 @@ function protobufdev()
 			print("not eq:",k)
 		end
 	end
+	
 	
 end
 protobufdev()

@@ -308,7 +308,6 @@ function protobufdev()
 		Fuint64 = 123000000000,
 		Fsint32 = -123000000,
 		Fsint64 = 123000000000,
-		
 		Ffixed32 = -123000000,
 		Ffixed64 = 12300000000,
 		Fdouble = math.pi, 
@@ -319,20 +318,20 @@ function protobufdev()
 		Fbytes = 'abc',
 		Fsfixed32 = -123000000,
 		Fsfixed64 = -12300000000,
-		-- Frepeatbool = {true, false, true},
-		-- Frepeatbool2 = {true, false, true},
-		-- Frepeatint = {255, 65536},
-		-- Frepeatint2 = {255, 65536},
-		-- Fstring2 = {"abc","abcd"},
-		-- Fenum = protos.TestEnum.SUNDAY,
-		-- Fmessage = protos.TestChild{
-			-- Fsint64 = 123,
-		-- },
-		-- Frepc = {protos.TestChild{
-			-- Fsint64 = 123,
-		-- },protos.TestChild{
-			-- Fsint64 = 234,
-		-- }},
+		Frepeatbool = {true, false, true},
+		Frepeatbool2 = {true, false, true},
+		Frepeatint = {255, 65536},
+		Frepeatint2 = {255, 65536},
+		Fstring2 = {"abc","abcd"},
+		Fenum = protos.TestEnum.SUNDAY,
+		Fmessage = protos.TestChild{
+			Fsint64 = 123,
+		},
+		Frepc = {protos.TestChild{
+			Fsint64 = 123,
+		},protos.TestChild{
+			Fsint64 = 234,
+		}},
 		Fmap = {[3]=7,[6]=5},
 	}
 	local b = t0:encode()

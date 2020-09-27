@@ -300,7 +300,7 @@ function protobufdev()
 	local b = protos.TestChild{
 		Fsint64 = 123,
 	}:encode()
-	print("TestType:",b)
+	print("TestChild:",b)
 	local t0 = protos.TestType{
 		Fint32 = -2100000000,
 		Fint64 = -123000000000,

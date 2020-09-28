@@ -32,9 +32,9 @@
 #define PBmap 19
 #define PBrep 20
 
-#define PB_OPT 1 //optional proto2
-#define PB_REP 2 //repeated
-#define PB_REQ 3 //required proto2
+#define LAB_OPT 1 //optional proto2
+#define LAB_REP 2 //repeated
+#define LAB_REQ 3 //required proto2
 
 #define MAX_CODE_LEN 0xfff0		//max len of code buffer 最大编码长度
 
@@ -47,7 +47,7 @@ typedef struct {
 	int size;		//packed=true时,总长计算用单个的长度,0用varsize
 	char* name;		//name
 } _PT;
-static _PT ProtoType[20] = { 0 };
+static _PT ProtoType[22] = { 0 };
 
 static void init()
 {
@@ -221,6 +221,7 @@ static void EncodeField(lua_State* L, int idx, int tp, char* buf, size_t* p)
 		break;
 	}
 	case PBmap: {
+
 		lua_errorEx(L, "unsupported map in map");
 		break;
 	}
@@ -234,7 +235,7 @@ static size_t encode_tab(lua_State* L, char *buf)
 		lua_errorEx(L, "#1 must table for duplicate");
 	lua_getmetatable(L, 1);
 
-	lua_getfield(L, -2, "syntax");
+	lua_getfield(L, -1, "syntax");
 	const char* syntax = lua_tostring(L, -1);
 	int proto2 = syntax == NULL || strcmp(syntax, "proto3");
 	lua_pop(L, 1);
@@ -251,7 +252,6 @@ static size_t encode_tab(lua_State* L, char *buf)
 
 		lua_rawgeti(L, top + 1, 2);//field[2] TP
 		int tp = lua_tointeger(L, -1);
-		int typeIdx = lua_gettop(L);
 		if (lua_istable(L, -1)) {
 			lua_getfield(L, -1, "pbtype");
 			tp = lua_tointeger(L, -1);
@@ -262,7 +262,7 @@ static size_t encode_tab(lua_State* L, char *buf)
 		int fn = lua_tointeger(L, -1);
 		lua_pop(L, 1);
 
-		int packed = ProtoType[tp].packed;
+		int packed = tp >> 16 ? 0 : ProtoType[tp].packed;
 		if (packed) {
 			lua_getfield(L, top + 1, "packed");
 			packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
@@ -273,14 +273,11 @@ static size_t encode_tab(lua_State* L, char *buf)
 		const char* name = lua_tostring(L, -1);
 		lua_gettable(L, 1); //t[k]
 
-		//check
-		if (tp == PBmap)
+		//if (tp == PBmap)
+		if (tp >> 16)
 		{
-			lua_rawgeti(L, typeIdx, 1);
-			int tpk = lua_tointeger(L, -1);
-			lua_rawgeti(L, typeIdx, 2);
-			int tpv = lua_tointeger(L, -1);
-			lua_pop(L, 2);
+			int tpk = tp >> 16;
+			int tpv = tp & 0xffff;
 			int wirek = ProtoType[tpk].wire;
 			int wirev = ProtoType[tpv].wire;
 			for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -304,16 +301,16 @@ static size_t encode_tab(lua_State* L, char *buf)
 
 		int vtp = lua_type(L, -1);
 		switch (lab) {
-		case PB_OPT:
+		case LAB_OPT:
 			if (vtp == LUA_TNIL)continue;
-		case PB_REQ: //if protobuf2
+		case LAB_REQ: //if protobuf2
 			if (vtp == LUA_TNIL)
 				lua_errorEx(L, "%s value required, got nil", name);
 
 			EncodeFieldType(fn, ProtoType[tp].wire, buf, &p);
 			EncodeField(L, -1, tp, buf, &p);
-			continue;
-		case PB_REP:
+			break;
+		case LAB_REP:
 			if (vtp == LUA_TNIL) continue;
 			if (vtp != LUA_TTABLE)
 				lua_errorEx(L, "%s repeated table required, got %s", name, lua_typename(L, vtp));
@@ -344,7 +341,7 @@ static size_t encode_tab(lua_State* L, char *buf)
 					EncodeField(L, -1, tp, buf, &p);
 				}
 			}
-			continue;
+			break;
 		}
 	}
 	return p;
@@ -595,20 +592,19 @@ static int lua_proto_decode(lua_State* L)
 		if (lua_isnil(L, -1))
 			lua_errorEx(L, "undefined field idx: %d", fn);
 
-		lua_rawgeti(L, 5, 1);//field[1] fieldlab
+		lua_rawgeti(L, 5, 1);//field[1] lab
 		int lab = lua_tointeger(L, -1);
 		lua_pop(L, 1);
 
 		lua_rawgeti(L, 5, 2);//field[2] TP
 		int tp = lua_tointeger(L, -1);
-		int typeIdx = lua_gettop(L);
 		if (lua_istable(L, -1)) {
 			lua_getfield(L, -1, "pbtype");
 			tp = lua_tointeger(L, -1);
 			lua_pop(L, 1);
 		}
 
-		int packed = ProtoType[tp].packed;
+		int packed = tp >> 16 ? 0 : ProtoType[tp].packed;
 		if (packed) {
 			lua_getfield(L, 5, "packed");
 			packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
@@ -616,7 +612,7 @@ static int lua_proto_decode(lua_State* L)
 		}
 
 		lua_rawgeti(L, 5, 3); //L 6 field[3] name
-		if (lab == PB_REP) {
+		if (lab == LAB_REP) {
 			if (packed) {
 				int plen = DecodeVarint(L, buf, &p);
 				size_t oldp = p;
@@ -642,8 +638,9 @@ static int lua_proto_decode(lua_State* L)
 			}
 		}
 		else {
-			if (tp == PBmap) {
-				lua_gettable(L, 2);//tab=t[name]
+			//if (tp == PBmap) {
+			if (tp >> 16) {
+				lua_gettable(L, 1);//tab=t[name]
 				if (!lua_istable(L, -1)) {
 					lua_createtable(L, 0, 2); //new tab
 					lua_rawgeti(L, 5, 3);//push name
@@ -651,16 +648,13 @@ static int lua_proto_decode(lua_State* L)
 					lua_settable(L, 1);//t[name]=tab
 				}
 				int plen = DecodeVarint(L, buf, &p);
-				lua_rawgeti(L, typeIdx, 1);
-				int tpk = lua_tointeger(L, -1);
-				lua_rawgeti(L, typeIdx, 2);
-				int tpv = lua_tointeger(L, -1);
-				//lua_pop(L, 2);
+				int tpk = tp >> 16;
+				int tpv = tp & 0xffff;
 				p++;//sub fn1
 				DecodeFieldVal(L, tpk, buf, &p);
 				p++;//sub fn2
 				DecodeFieldVal(L, tpv, buf, &p);
-				lua_settable(L, -5);
+				lua_settable(L, -3);
 			}
 			else {
 				DecodeFieldVal(L, tp, buf, &p);
@@ -679,84 +673,16 @@ static int lua_proto_code(lua_State* L)
 static int lua_proto_utils(lua_State* L)
 {
 	luaL_dostring(L,
-"function proto.package(pname, syntax)\
-	local pack = proto.loaded[pname]\
-	if pack then return pack end\
-	pack = {}\
-	proto.loaded[pname] = pack\
-	return setmetatable(pack, {\
-		__index = {\
-			enum = function(self, name, enum)\
-				local value = {}\
-				for k,v in pairs(enum) do\
-					assert(value[v]==nil,name..' duplicated enum value :'..v)\
-					assert(math.floor(v)==v, name..' enum value must be int32'..v)\
-					value[v] = k\
-				end\
-				local enum_meta = {__index={pbtype = proto.enum, syntax = syntax, value=value}}\
-				setmetatable(enum,enum_meta)\
-				rawset(self,name,enum)\
-				return enum\
-			end,\
-			message = function(self, name, msg)\
-				local fields = {} \
-				for _,v in pairs(msg) do\
-					local flab = v[1]\
-					local ftp = v[2]\
-					if type(ftp)=='table' then\
-						assert(ftp.pbtype~=proto.message or syntax==ftp.syntax, 'sub message syntax必须相同')\
-						ftp = ftp.pbtype\
-					end\
-					local fname = v[3]\
-					local fn = v[4]\
-					assert(fields[fn]==nil,name..' duplicated field : '..fn)\
-					\
-					if syntax=='proto3' then\
-						assert(v[1]==proto.OPT or v[1]==proto.REP, 'proto3 unsupported '..fname)\
-						assert(v.default==nil,'[default] proto3 unsupported')\
-					end\
-					if ftp==proto.map and flab~=proto.OPT then\
-						error('Field labels are not allowed on map fields')\
-					end\
-					if not proto.primitive[ftp] then\
-						assert(v.packed~=true, '[packed=] can only be specified for repeated primitive fields:'..fname)\
-					end\
-					fields[fn] = v \
-				end\
-				local message_meta = { syntax = syntax, message = msg, fields = fields}\
-				message_meta.__index = {\
-					syntax = syntax,\
-					pbtype = proto.message,\
-					encode = proto.encode,\
-					decode = function(buf)\
-						return proto.decode(buf, setmetatable({}, message_meta))\
-					end,\
-				}\
-				message_meta.__call = function(self,t)\
-					return setmetatable(t, message_meta)\
-				end\
-				rawset(self,name,msg)\
-				return setmetatable(msg, message_meta)\
-			end,\
-		}\
-	})\
-end");
+"");
 	return 0;
 }
 
-//function(ktp, vtp)
-//	return setmetatable({ ktp,vtp }, { __index = {pbtype = PBmap} })
-//end
 static int Map_metatable = 0;
 static int lua_definemap(lua_State* L)
 {
-	lua_createtable(L, 2, 0);
-	lua_pushvalue(L, 1);
-	lua_rawseti(L, 3, 1);
-	lua_pushvalue(L, 2);
-	lua_rawseti(L, 3, 2);
-	lua_getref(L, Map_metatable);
-	lua_setmetatable(L, -2);
+	int ktp = lua_tointeger(L, 1);
+	int vtp = lua_tointeger(L, 2);
+	lua_pushinteger(L, ktp << 16 | vtp);
 	return 1;
 }
 
@@ -781,20 +707,20 @@ LUA_API void luaopen_protobuf(lua_State* L)
 	lua_setfield(L, -2, "encode");
 	lua_createtable(L, 0, 0);
 	lua_setfield(L, -2, "loaded"); //package loaded
-	lua_pushinteger(L, PB_OPT), lua_setfield(L, -2, "OPT");
-	lua_pushinteger(L, PB_REP), lua_setfield(L, -2, "REP");
-	lua_pushinteger(L, PB_REQ), lua_setfield(L, -2, "REQ");
+	lua_pushinteger(L, LAB_OPT), lua_setfield(L, -2, "OPT");
+	lua_pushinteger(L, LAB_REP), lua_setfield(L, -2, "REP");
+	lua_pushinteger(L, LAB_REQ), lua_setfield(L, -2, "REQ");
 
 	lua_createtable(L, 0, 0);
-		lua_createtable(L, 0, 20);
-		for (int i = 0; i < 20; i++)
+		lua_createtable(L, 0, 22);
+		for (int i = 0; i < 22; i++)
 			if (ProtoType[i].name != NULL)
 				lua_pushinteger(L, i), lua_setfield(L, -2, ProtoType[i].name);
 		lua_setfield(L, -2, "__index");
 	lua_setmetatable(L, -2);
 
-	lua_createtable(L, 0, 20);
-	for (int i = 0; i < 20; i++) {
+	lua_createtable(L, 0, 22);
+	for (int i = 0; i < 22; i++) {
 		if (ProtoType[i].packed)
 			lua_pushboolean(L, 1), lua_rawseti(L, -2, i);
 	}
@@ -802,5 +728,5 @@ LUA_API void luaopen_protobuf(lua_State* L)
 
 	lua_setglobal(L, GLOBAL_LIB_NAME);
 	//方便用lua写的
-	lua_proto_utils(L);
+	//lua_proto_utils(L);
 }

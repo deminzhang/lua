@@ -153,6 +153,7 @@ return _pb
 	
 end
 
+dump(getmetatable(proto))
 
 function proto.import(pname)
 	
@@ -197,7 +198,7 @@ function proto.package(pname, syntax)
 					if ftp==proto.map and flab~=proto.OPT then
 						error('Field labels are not allowed on map fields')
 					end
-					if not proto.primitive[ftp] then
+					if not proto.packedType[ftp] then
 						assert(v.packed~=true, '[packed=] can only be specified for repeated primitive fields:'..fname)
 					end
 					fields[fn] = v 
@@ -208,11 +209,17 @@ function proto.package(pname, syntax)
 					pbtype = proto.message,
 					encode = proto.encode,
 					decode = function(buf)
-						return proto.decode(buf, setmetatable({}, message_meta))
+						return proto.decode(msg, buf)
 					end,
 				}
 				message_meta.__call = function(self,t)
 					return setmetatable(t, message_meta)
+				end
+				message_meta.__eq = function(self,t)
+					for k,v in pairs(self) do
+						if t[k]~=v then return false end
+					end
+					return true
 				end
 				rawset(pack,name,msg)
 				return setmetatable(msg, message_meta)
@@ -220,6 +227,7 @@ function proto.package(pname, syntax)
 		}
 	})
 end
+
 -- end
 
 function protobufdev()
@@ -322,7 +330,7 @@ function protobufdev()
 		Frepeatbool2 = {true, false, true},
 		Frepeatint = {255, 65536},
 		Frepeatint2 = {255, 65536},
-		Fstring2 = {"abc","abcd"},
+		Fstring2 = {"","abcd"},
 		Fenum = protos.TestEnum.SUNDAY,
 		Fmessage = protos.TestChild{
 			Fsint64 = 123,

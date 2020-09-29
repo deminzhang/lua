@@ -35,6 +35,7 @@
 #define LAB_OPT 1 //optional proto2
 #define LAB_REP 2 //repeated
 #define LAB_REQ 3 //required proto2
+#define LAB_MAP 4 //更适合当lab
 
 #define MAX_CODE_LEN 0xfff0		//max len of code buffer 最大编码长度
 
@@ -73,12 +74,6 @@ static void init()
 	ProtoType[PBfixed32] = (_PT){ WIRE_FIXED32 ,1,4,"fixed32" };
 	ProtoType[PBsfixed32] = (_PT){ WIRE_FIXED32 ,1,4,"sfixed32" };
 	ProtoType[PBfloat] = (_PT){ WIRE_FIXED32 ,1,4,"float" };
-}
-
-static int lua_protoc(lua_State* L)
-{
-	//protoc("protos",files)
-	return 0;
 }
 
 static unsigned char SizeVarint(size_t x) {
@@ -245,37 +240,28 @@ static size_t encode_tab(lua_State* L, char *buf)
 	for (int i = 1;; i++, lua_settop(L, top)) {
 		lua_rawgeti(L, top, i);//field=fields[i]
 		if (lua_isnil(L, -1)) break;
-
-		lua_rawgeti(L, top + 1, 1);//field[1] fieldlab
-		int lab = lua_tointeger(L, -1);
+		//ff ff ff ff lab tpk tpv packed
+		lua_rawgeti(L, top + 1, 0);//field[1] lab
+		int lab0 = lua_tointeger(L, -1);
 		lua_pop(L, 1);
+		int lab = lab0 >> 24;
+		int tp = lab0 >> 8 & 0xffff;
+		int packed0 = lab0 & 0xff;
+		int packed = ProtoType[tp].packed && (packed0 == 2 ? (proto2 ? 0 : 1) : packed0);
 
 		lua_rawgeti(L, top + 1, 2);//field[2] TP
-		int tp = lua_tointeger(L, -1);
-		if (lua_istable(L, -1)) {
-			lua_getfield(L, -1, "pbtype");
-			tp = lua_tointeger(L, -1);
-			lua_pop(L, 1);
-		}
-
 		lua_rawgeti(L, top + 1, 4);//field[4] FN
 		int fn = lua_tointeger(L, -1);
 		lua_pop(L, 1);
-
-		int packed = tp >> 16 ? 0 : ProtoType[tp].packed;
-		if (packed) {
-			lua_getfield(L, top + 1, "packed");
-			packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
-			lua_pop(L, 1);
-		}
 
 		lua_rawgeti(L, top + 1, 3); //field[3] name
 		const char* name = lua_tostring(L, -1);
 		lua_gettable(L, 1); //t[k]
 
-		//if (tp == PBmap)
-		if (tp >> 16)
-		{
+		int vtp = lua_type(L, -1);
+		switch (lab) {
+		case LAB_MAP:
+			if (vtp == LUA_TNIL) continue;
 			int tpk = tp >> 16;
 			int tpv = tp & 0xffff;
 			int wirek = ProtoType[tpk].wire;
@@ -296,19 +282,6 @@ static size_t encode_tab(lua_State* L, char *buf)
 				EncodeVarint(kvlen, buf, &p); //p+=lenSize
 				p += kvlen;
 			}
-			continue;
-		}
-
-		int vtp = lua_type(L, -1);
-		switch (lab) {
-		case LAB_OPT:
-			if (vtp == LUA_TNIL)continue;
-		case LAB_REQ: //if protobuf2
-			if (vtp == LUA_TNIL)
-				lua_errorEx(L, "%s value required, got nil", name);
-
-			EncodeFieldType(fn, ProtoType[tp].wire, buf, &p);
-			EncodeField(L, -1, tp, buf, &p);
 			break;
 		case LAB_REP:
 			if (vtp == LUA_TNIL) continue;
@@ -319,7 +292,7 @@ static size_t encode_tab(lua_State* L, char *buf)
 			if (packed) {
 				EncodeFieldType(fn, WIRE_BYTES, buf, &p);
 				int sumLen = ProtoType[tp].size;
-				if (sumLen==0)
+				if (sumLen == 0)
 					for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 						lua_rawgeti(L, -1, j);
 						double V = lua_tonumber(L, -1);
@@ -330,7 +303,7 @@ static size_t encode_tab(lua_State* L, char *buf)
 				EncodeVarint(sumLen, buf, &p);
 				for (int j = 1; j <= size; j++, lua_pop(L, 1)) {
 					lua_rawgeti(L, -1, j);
-					EncodeField(L, -1,tp, buf, &p);
+					EncodeField(L, -1, tp, buf, &p);
 				}
 			}
 			else {
@@ -341,6 +314,15 @@ static size_t encode_tab(lua_State* L, char *buf)
 					EncodeField(L, -1, tp, buf, &p);
 				}
 			}
+			break;
+		case LAB_OPT:
+			if (vtp == LUA_TNIL)continue;
+		case LAB_REQ: //if protobuf2
+			if (vtp == LUA_TNIL)
+				lua_errorEx(L, "%s value required, got nil", name);
+
+			EncodeFieldType(fn, ProtoType[tp].wire, buf, &p);
+			EncodeField(L, -1, tp, buf, &p);
 			break;
 		}
 	}
@@ -544,19 +526,19 @@ static void DecodeFieldVal(lua_State* L, int tp, const char *buf, size_t*p)
 		*p += V;
 		break;
 	}
-	case PBmap: {
-		//in lua_proto_decode
-		break;
-	}
 	case PBmessage: {
 		V = DecodeVarint(L, buf, p);
 		lua_rawgeti(L, 5, 2);
 		lua_getfield(L, -1, "decode");
-		lua_replace(L, -2);
+		lua_insert(L, -2);
 		char* u = lua_newBytes(L, V); //TODO lua_pushlightuserdata(L, val);
 		memcpy(u, buf + *p, V);
-		lua_call(L, 1, 1);
+		lua_call(L, 2, 1); //decode(Msg,buf)
 		*p += V;
+		break;
+	}
+	case PBmap: {
+		//in lua_proto_decode
 		break;
 	}
 	default:
@@ -591,28 +573,20 @@ static int lua_proto_decode(lua_State* L)
 		lua_rawgeti(L, 4, fn);//L5 field=fields[i]
 		if (lua_isnil(L, -1))
 			lua_errorEx(L, "undefined field idx: %d", fn);
-
-		lua_rawgeti(L, 5, 1);//field[1] lab
-		int lab = lua_tointeger(L, -1);
+		//lab tpk tpv packed
+		lua_rawgeti(L, 5, 0);//field[1] lab
+		int lab0 = lua_tointeger(L, -1);
 		lua_pop(L, 1);
+		int lab = lab0 >> 24;
+		int tp = lab0 >> 8 & 0xffff;
+		int packed0 = lab0 & 0xff;
+		int packed = ProtoType[tp].packed && (packed0 == 2 ? (proto2 ? 0 : 1) : packed0);
 
 		lua_rawgeti(L, 5, 2);//field[2] TP
-		int tp = lua_tointeger(L, -1);
-		if (lua_istable(L, -1)) {
-			lua_getfield(L, -1, "pbtype");
-			tp = lua_tointeger(L, -1);
-			lua_pop(L, 1);
-		}
-
-		int packed = tp >> 16 ? 0 : ProtoType[tp].packed;
-		if (packed) {
-			lua_getfield(L, 5, "packed");
-			packed = lua_isnil(L, -1) ? (proto2 ? 0 : 1) : lua_toboolean(L, -1);
-			lua_pop(L, 1);
-		}
-
-		lua_rawgeti(L, 5, 3); //L 6 field[3] name
-		if (lab == LAB_REP) {
+		lua_rawgeti(L, 5, 3); //field[3] name
+		switch (lab)
+		{
+		case LAB_REP: 
 			if (packed) {
 				int plen = DecodeVarint(L, buf, &p);
 				size_t oldp = p;
@@ -636,48 +610,56 @@ static int lua_proto_decode(lua_State* L)
 				lua_rawseti(L, -2, ++i); //arr[+]=val
 				lua_pop(L, 1); //pop arr
 			}
-		}
-		else {
-			//if (tp == PBmap) {
-			if (tp >> 16) {
-				lua_gettable(L, 1);//tab=t[name]
-				if (!lua_istable(L, -1)) {
-					lua_createtable(L, 0, 2); //new tab
-					lua_rawgeti(L, 5, 3);//push name
-					lua_pushvalue(L, -2);
-					lua_settable(L, 1);//t[name]=tab
-				}
-				int plen = DecodeVarint(L, buf, &p);
-				int tpk = tp >> 16;
-				int tpv = tp & 0xffff;
-				p++;//sub fn1
-				DecodeFieldVal(L, tpk, buf, &p);
-				p++;//sub fn2
-				DecodeFieldVal(L, tpv, buf, &p);
-				lua_settable(L, -3);
+			break;
+		case LAB_MAP:  //PBmap
+			lua_gettable(L, 1);//tab=t[name]
+			if (!lua_istable(L, -1)) {
+				lua_createtable(L, 0, 2); //new tab
+				lua_rawgeti(L, 5, 3);//push name
+				lua_pushvalue(L, -2);
+				lua_settable(L, 1);//t[name]=tab
 			}
-			else {
-				DecodeFieldVal(L, tp, buf, &p);
-				lua_settable(L, 1);
-			}
+			int plen = DecodeVarint(L, buf, &p);
+			int tpk = tp >> 16;
+			int tpv = tp & 0xffff;
+			p++;//sub fn1
+			DecodeFieldVal(L, tpk, buf, &p);
+			p++;//sub fn2
+			DecodeFieldVal(L, tpv, buf, &p);
+			lua_settable(L, -3);
+			break;
+		default: 
+			DecodeFieldVal(L, tp, buf, &p);
+			lua_settable(L, 1);
+			break;
 		}
 	}
 	lua_settop(L, 1);
 	return 1;
 }
 
-static int lua_proto_code(lua_State* L) 
+static int lua_protoc(lua_State* L)
 {
+	//in lua
+	return 0;
+}
+
+static int lua_proto_package(lua_State* L) 
+{
+	//in lua
+}
+
+static int lua_proto_import(lua_State* L) 
+{
+	//in lua
 }
 
 static int lua_proto_utils(lua_State* L)
 {
-	luaL_dostring(L,
-"");
+	//luaL_dostring(L,"");
 	return 0;
 }
 
-static int Map_metatable = 0;
 static int lua_definemap(lua_State* L)
 {
 	int ktp = lua_tointeger(L, 1);
@@ -689,16 +671,8 @@ static int lua_definemap(lua_State* L)
 LUA_API void luaopen_protobuf(lua_State* L)
 {
 	init();
-	lua_createtable(L, 0, 1);
-	lua_createtable(L, 0, 1);
-	lua_pushinteger(L, PBmap);
-	lua_setfield(L, -2, "pbtype");
-	lua_setfield(L, -2, "__index");
-	Map_metatable = lua_ref(L, -1);
 
 	lua_createtable(L, 0, 2);
-	lua_pushcfunction(L, lua_protoc);
-	lua_setfield(L, -2, "protoc");
 	lua_pushcfunction(L, lua_definemap);
 	lua_setfield(L, -2, "Map");
 	lua_pushcfunction(L, lua_proto_decode);
@@ -710,6 +684,7 @@ LUA_API void luaopen_protobuf(lua_State* L)
 	lua_pushinteger(L, LAB_OPT), lua_setfield(L, -2, "OPT");
 	lua_pushinteger(L, LAB_REP), lua_setfield(L, -2, "REP");
 	lua_pushinteger(L, LAB_REQ), lua_setfield(L, -2, "REQ");
+	lua_pushinteger(L, LAB_MAP), lua_setfield(L, -2, "MAP");
 
 	lua_createtable(L, 0, 0);
 		lua_createtable(L, 0, 22);
@@ -728,5 +703,5 @@ LUA_API void luaopen_protobuf(lua_State* L)
 
 	lua_setglobal(L, GLOBAL_LIB_NAME);
 	//方便用lua写的
-	//lua_proto_utils(L);
+	lua_proto_utils(L);
 }

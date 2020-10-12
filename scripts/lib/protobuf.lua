@@ -88,6 +88,9 @@ return _pb
 			repeat --嵌套{} 内层提到local
 				t,n = t:gsub('([%w_]+%s*[%w_]+%s*%{%s*)([^{}]-)([%w_]+%s*[%w_]+%s*%{)([^{}]-%}\r\n)(.-)','%3%4%1%2%5')
 			until n==0
+			repeat
+				t,n = t:gsub("(\t\t)","\t")
+			until n==0
 			
 			t,n = t:gsub('enum%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\r\n_pb.enum.%1 = %1')
 			t,n = t:gsub('message%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\r\n_pb.message.%1 = %1')

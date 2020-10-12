@@ -565,9 +565,8 @@ static int lua_proto_decode(lua_State* L)
 	int proto2 = syntax == NULL || strcmp(syntax, "proto3");
 	lua_pop(L, 1);
 
-	int fn = 0;	//feild number
-	int wt;	//wire type
 	int top = lua_gettop(L);
+	int fn, wt;	//wire type
 	for (size_t p = 0; p < len; lua_settop(L, top)) {
 		DecodeFieldType(buf, &p, &fn, &wt);
 		lua_rawgeti(L, 4, fn);//L5 field=fields[i]

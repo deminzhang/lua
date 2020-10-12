@@ -39,12 +39,39 @@ return _pb
 			local f = io.open(proto_path..'/'..fn,'rb')
 			local t = f:read("*a")
 			f:close()
+			-- t = [[
+
+-- message TA {
+	-- int32 a = 1;
+-- }
+-- message TB1 {
+	-- int32 a = 1;
+	-- message TB_2A{
+		-- int32 b = 1;
+		-- message TB3{
+			-- int32 c = 1;
+		-- }
+		-- TB3 f = 2;
+	-- }
+	-- TB_2A d = 2;
+	-- message TB_2B{
+		-- int32 e = 1;
+	-- }
+	-- TB_2B f = 3;
+-- }
+
+			-- ]]
 			local n = 0
 			local fw = io.open('proto/'..ff..'.lua','wb')
 			t,n = t:gsub("//(.-)\r\n","--%1\r\n") --comment
 			repeat
 				t,n = t:gsub("(\r\n\r\n\r\n)","\r\n\r\n")
 			until n==0
+			repeat
+				t,n = t:gsub("(\t\t)","\t")
+			until n==0
+			t,n = t:gsub("(\t})","}")
+			
 			local syntax = t:gmatch("syntax%s*=%s*\"(%w+)\"%s*;")() or 'proto2'
 			if syntax=='proto3' then
 				if t:gmatch('%[(default%s*=)')() then
@@ -52,17 +79,18 @@ return _pb
 				end
 			end
 			local packname = t:gmatch('package%s+([%w_]+)%s*;')() or 'protos'
+			print('packname:',packname)
 			
 			t,n = t:gsub('syntax%s*=%s*(\"%w+\")%s*;',"local syntax = %1") --syntax
 			t,n = t:gsub('package%s+([%w_]+)%s*;','local _pb = proto.package(\"%1\",syntax)')
 			t,n = t:gsub('import%s+\"([%w_]+)%.proto\";','local %1 = proto.import\"proto.%1\"') --import TODO
 			
-			-- repeat --嵌套message 提到local
-			-- t,n = t:gsub('(message%s*[%w_]+%s*{.-)(message%s*[%w_]+%s*{.-})(.-})', '%2\n%1%3') 
-			-- until n==0
+			repeat --嵌套{} 内层提到local
+				t,n = t:gsub('([%w_]+%s*[%w_]+%s*%{%s*)([^{}]-)([%w_]+%s*[%w_]+%s*%{)([^{}]-%}\r\n)(.-)','%3%4%1%2%5')
+			until n==0
 			
-			t,n = t:gsub('enum%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\n_pb.enum.%1 = %1')
-			t,n = t:gsub('message%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\n_pb.message.%1 = %1')
+			t,n = t:gsub('enum%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\r\n_pb.enum.%1 = %1')
+			t,n = t:gsub('message%s*([%w_]+)%s*{(.-)}','local %1 = {%2}\r\n_pb.message.%1 = %1')
 			t,n = t:gsub('([%w_]+%.?[%w_]+)%s+([%w_]+)%s*=%s*(%d+)%s*%[(.-)%]%s*;','{OPT, %1, \"%2\", %3, %4},')
 			t,n = t:gsub('([%w_]+%.?[%w_]+)%s+([%w_]+)%s*=%s*(%d+)%s*;','{OPT, %1, \"%2\", %3},')
 			t,n = t:gsub('map<(%w+),([%w_]+)>%s*([%w_]+)%s*=%s*(%d+)%s*;','{OPT, _map(%1,%2), \"%3\", %4},')
@@ -111,11 +139,14 @@ function proto.package(pname, syntax)
 	return setmetatable(pack, {
 		__index = {
 			enum = setmetatable({},{__newindex=function(self, name, enum)
+				-- assert(pack[name]==nil,name..' already defined in package '..pname)
 				local value = {}
 				for k,v in pairs(enum) do
+					assert(pack[v]==nil,k..' already defined in package '..pname)
 					assert(value[v]==nil,name..' duplicated enum value:'..v)
 					assert(math.floor(v)==v, name..' enum value must be int32'..v)
 					value[v] = k
+					pack[v] = k
 				end
 				local _meta = {__index={pbtype = proto.enum, value=value}}
 				setmetatable(enum,_meta)
@@ -123,6 +154,7 @@ function proto.package(pname, syntax)
 				return enum
 			end}),
 			message = setmetatable({},{__newindex=function(self, name, msg)
+				-- assert(pack[name]==nil,name..' already defined in package '..pname)
 				local fields = {} 
 				for _,v in ipairs(msg) do
 					local flab = v[1]
@@ -224,7 +256,7 @@ function protobuf_test()
 		{OPT, fixed32, 'Ffixed32', 7},
 		{OPT, fixed64, 'Ffixed64', 8},
 		{OPT, double, 'Fdouble', 9},
-		{OPT, float, 'Ffloat', 10}, --warning:lua用float通信会损失精度,建议浮点都用double
+		{OPT, float, 'Ffloat', 10}, --warning: lua用float通信会损失精度
 		{OPT, bool, 'Fbool', 11},
 		{OPT, TestEnum, 'Fenum', 12},
 		{OPT, _M(int64,int32), 'Fmap', 13},

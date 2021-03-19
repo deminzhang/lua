@@ -45,7 +45,7 @@
 typedef struct {
 	int wire;		//类型对应WIRE类型
 	int packed;		//可使用packed
-	int size;		//packed=true时,总长计算用单个的长度,0用varsize
+	int size;		//packed=true时,总长计算用单个的长度,0用变长varsize
 	char* name;		//name
 } _PT;
 static _PT ProtoType[22] = { 0 };
@@ -136,14 +136,28 @@ static void EncodeField(lua_State* L, int idx, int tp, char* buf, size_t* p)
 		break;
 	}
 	case PBint64:
-	case PBuint64: 
+	case PBuint64: {
+		double V = lua_tonumber(L, idx);
+		long long v = double2long(V);
+		if (v != (long long)v)
+			lua_errorEx(L, "%d not varint", v);
+		EncodeVarint(v, buf, p);
+		break;
+	}
+	case PBuint32: {
+		double V = lua_tonumber(L, idx);
+		long long v = double2uint(V);
+		if (v != (long long)v || v<0 || v>4294967296)
+			lua_errorEx(L, "%d not uint32", v);
+		EncodeVarint(v, buf, p);
+		break;
+	}
 	case PBint32:
-	case PBuint32:
 	case PBenum: {
 		double V = lua_tonumber(L, idx);
 		long long v = (long long)V;
-		if (v != (long long)v)
-			lua_errorEx(L, "%d not varint", v);
+		if (v != (int)v)
+			lua_errorEx(L, "%d not int32", v);
 		EncodeVarint(v, buf, p);
 		break;
 	}
@@ -157,7 +171,7 @@ static void EncodeField(lua_State* L, int idx, int tp, char* buf, size_t* p)
 	}
 	case PBsint64: {//PBzigzag64
 		double V = lua_tonumber(L, idx);
-		long long v = (long long)V;
+		long long v = double2long(V);
 		if (v != (long long)v)
 			lua_errorEx(L, "%d not sint64", v);
 		EncodeZigzag64((size_t)v, buf, p);
@@ -166,7 +180,7 @@ static void EncodeField(lua_State* L, int idx, int tp, char* buf, size_t* p)
 	case PBfixed64:
 	case PBsfixed64: {
 		double V = lua_tonumber(L, idx);
-		long long v = (long long)V;
+		long long v = double2long(V);
 		if (v != (long long)v)
 			lua_errorEx(L, "%d not int or long long", v);
 		*(long long*)(buf + *p) = v;
@@ -334,8 +348,8 @@ static int lua_proto_encode(lua_State* L)
 		lua_errorEx(L, "[C]invalid #1 no data to encode");
 
 	int top = lua_gettop(L);
-	//char buf[MAX_CODE_LEN + 1];
-	char *buf = (char*)malloc(MAX_CODE_LEN + 1);
+	//char buf[MAX_CODE_LEN + 1];//太大用堆
+	char *buf = (char*)malloc(MAX_CODE_LEN + 1); //TODO 用内存池
 	if (buf == NULL)
 		lua_errorEx(L, "[C]lua_proto_encode not enough memory");
 
@@ -661,6 +675,14 @@ static int lua_proto_utils(lua_State* L)
 
 static int lua_definemap(lua_State* L)
 {
+	if (lua_istable(L, 1)) {
+		lua_getfield(L, 1, "_pbtype");
+		lua_replace(L, 1);
+	}
+	if (lua_istable(L, 2)) {
+		lua_getfield(L, 1, "_pbtype");
+		lua_replace(L, 1);
+	}
 	int ktp = lua_tointeger(L, 1);
 	int vtp = lua_tointeger(L, 2);
 	lua_pushinteger(L, ktp << 16 | vtp);

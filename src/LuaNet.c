@@ -71,8 +71,8 @@ typedef struct TCPNet {
 
 static TCPNet *_Listeners = NULL;
 static TCPNet *_Nets = NULL;	//非listener
-static char *_Buffer = NULL; //reuse
-static int _BufferIdx = 0;
+static char *_Buf = NULL; //reuse
+static int _BufIdx = 0;
 #ifdef USENETEPOLL
 static int epoll_fd;
 #endif
@@ -223,7 +223,7 @@ static void net_accept(lua_State *L, TCPNet *listener)
 
 #else
 		if (listener->state == NETSHARE) {
-			struct iovec e = { _Buffer, NETBUFLEN };
+			struct iovec e = { _Buf, NETBUFLEN };
 			char cmsg[CMSG_SPACE(4)];
 			struct msghdr m = { NULL, 0, &e, 1, cmsg, CMSG_LEN(4), 0 };
 			int n = recvmsg(listener->sock, &m, 0);
@@ -286,7 +286,7 @@ static void net_accept(lua_State *L, TCPNet *listener)
 		}
 
 		if (taken){
-			lua_getref(L, _BufferIdx);
+			lua_getref(L, _BufIdx);
 			//lua_pushinteger(L, taken);
 			//lua_setfieldUD(L, -2, "._lenth");
 			lua_setBytesLen(L, -1, taken);
@@ -314,7 +314,7 @@ static void net_receive(lua_State *L, TCPNet *net)
 	int len = net->len;
 	int tostr = net->decode;
 
-	int taken = recv(net->sock, _Buffer, len, MSG_PEEK); //check len
+	int taken = recv(net->sock, _Buf, len, MSG_PEEK); //check len
 	if (taken == 0) {
 		net_close(L, net, "peer reset", 0);
 		return;
@@ -330,18 +330,18 @@ static void net_receive(lua_State *L, TCPNet *net)
 		return;
 	}
 
-	recv(net->sock, _Buffer, len, 0); //real recv
+	recv(net->sock, _Buf, len, 0); //real recv
 	//net->timeout = 0x7fffffff; //if not reset onReceive use last
-	_Buffer[taken] = '\0';
+	_Buf[taken] = '\0';
 	lua_getUserdata(L, net);
 	lua_getfieldUD(L, -1, "._onReceive");
 	//TODO assert(onReceive,"no set onReceive")
 
 	lua_pushvalue(L, -2);
 	if (tostr)
-		lua_pushlstring(L, _Buffer, taken);
+		lua_pushlstring(L, _Buf, taken);
 	else {
-		lua_getref(L, _BufferIdx);//TODO 复用buff 如果lua中保存 要拷贝
+		lua_getref(L, _BufIdx);//TODO 复用buff 如果lua中保存 要拷贝
 		//lua_pushinteger(L, taken);
 		//lua_setfieldUD(L, -2, "._lenth");
 		lua_setBytesLen(L, -1, taken);
@@ -360,7 +360,7 @@ static void net_receiveSep(lua_State *L, TCPNet *net)
 	int len = net->len;
 	int tostr = net->decode;
 
-	int taken = recv(net->sock, _Buffer, len, MSG_PEEK); //check len
+	int taken = recv(net->sock, _Buf, len, MSG_PEEK); //check len
 	if (taken == 0) {
 		net_close(L, net, "peer reset", 0);
 		return;
@@ -383,7 +383,7 @@ static void net_receiveSep(lua_State *L, TCPNet *net)
 		lua_pop(L, 1);
 		i = 0;
 		do
-			if (memcmp(_Buffer + i, sep, n) == 0)
+			if (memcmp(_Buf + i, sep, n) == 0)
 			{
 				sn = i;
 				rev = 1;
@@ -393,7 +393,7 @@ static void net_receiveSep(lua_State *L, TCPNet *net)
 
 		if (rev) {
 			taken = n + sn;
-			recv(net->sock, _Buffer, taken, 0);
+			recv(net->sock, _Buf, taken, 0);
 			break;
 		}
 	}
@@ -405,15 +405,15 @@ static void net_receiveSep(lua_State *L, TCPNet *net)
 	}
 
 	//net->timeout = 0x7fffffff;
-	_Buffer[taken] = '\0';
+	_Buf[taken] = '\0';
 	lua_getUserdata(L, net);
 	int t = lua_type(L, -1);
 	lua_getfieldUD(L, -1, "._onReceive");
 	lua_pushvalue(L, -2);
 	if (tostr)
-		lua_pushlstring(L, _Buffer, taken);
+		lua_pushlstring(L, _Buf, taken);
 	else{
-		lua_getref(L, _BufferIdx);//TODO 复用buff 如果lua中保存 要拷贝
+		lua_getref(L, _BufIdx);//TODO 复用buff 如果lua中保存 要拷贝
 		//lua_pushinteger(L, taken);
 		//lua_setfieldUD(L, -2, "._lenth");
 		lua_setBytesLen(L, -1, taken);
@@ -1326,9 +1326,9 @@ LUA_API void luaopen_net(lua_State *L, int sock0) {
 	//static local-------------------------------------
 	_Listeners = NULL;
 	_Nets = NULL;
-	_Buffer = lua_newBytes(L, BUFFERSIZE);
+	_Buf = lua_newBytes(L, BUFFERSIZE);
 	lua_setBytesLen(L, -1, 0);
-	_BufferIdx = lua_ref(L, -1);
+	_BufIdx = lua_ref(L, -1);
 	//reg to lua-------------------------------------
 	struct luaL_Reg methods[] = {
 		{ "__gc",   luanet_gc },

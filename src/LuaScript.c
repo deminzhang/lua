@@ -1,15 +1,5 @@
 #include "LuaScript.h"
 
-//#ifdef LUAJIT_VERSION
-	//#include "../luajit/src/lj_gc.h"
-	//#include "../luajit/src/lj_obj.h"
-	//#include "../luajit/src/lj_tab.h"
-	//#include "../luajit/src/lj_api.c"
-//#else
-//	#include "../lua-5.3.4/src/lobject.h"
-//	#include "../lua-5.3.4/src/ltable.h"
-//#endif
-
 static int _WeakV_PTR2UD; //PTR find userdata C对象指定找对应userdata
 static int _WeakK_UD_PROPERTY; //property table of userdata [ud] = {} userdata挂载附加属性表
 static int _BytesMeta; //metatable of bytes

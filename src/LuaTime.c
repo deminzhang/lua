@@ -45,7 +45,7 @@ long long timeNow(double unit, int utc)
 		us = timelast;
 	if (!utc)
 		us += timediff * 1000000LL;
-	uu = us / (unit * 1000000);
+	uu = us / (unit * 1000000LL);
 	return uu;
 }
 long long time_Now(double unit, int utc)

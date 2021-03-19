@@ -12,6 +12,7 @@ extern "C" {
 #include "LuaTime.h"
 #include "LuaCode.h"
 #include "LuaQueue.h"
+#include "LuaProtoBuf.h"
 //#include "LuaSqlite3.h"
 //#include "LuaZip.h"
 #ifdef __cplusplus
@@ -74,6 +75,7 @@ LUA_API int luaopenEx(lua_State *L)
 	luaopen_queue(L);
 	//luaopen_zip(L);
 	luaopen_net(L, 0);
+	luaopen_protobuf(L);
 #ifdef USESQLITE3
 	luaopen_sqlite3(L);
 #endif

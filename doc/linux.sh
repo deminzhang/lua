@@ -42,6 +42,7 @@
 #以上都是临时改网络，重启后还原为默认网络
 
 #查看端口
+	netstat -tunpl
 	netstat -nap	#p所属进程
 	netstat -napt	#只更tcp
 	netstat -napu	#只列udp
@@ -208,9 +209,11 @@ fi
 	git add -u newname #-u选项会更新已经追踪的文件和文件夹
 	git commit -m "rename"
 	git push origin master #push到远程
-	git stash #暂存修改
+	git stash #暂存修改               
 	git stash list
 	git stash pop
+	git fetch --all  #1拉而不合
+	git reset --hard origin/master #2强制重置为远程库一样
 
 ##SSH--------------------------
 	ssh localhost --测试己安：
@@ -239,6 +242,8 @@ fi
 	#回车3次 默认生成/root/.ssh/id_rsa*
 	#将生成的*.pub内容拷到目标主机/root/.ssh/authorized_keys内
 	scp -p ~/.ssh/id_rsa.pub root@10.45.11.29:/root/id_rsa.pub
+	scp -p root@10.45.11.29:/data/app/web/dev-git/install/soft/xxtea-lua-master.zip /d/
+	scp -p root@10.45.11.29:/data/app/web/pub-git/install/soft/lua-xxtea-1.0.tar.gz /d/
 	#scp /c/Users/Administrator/.ssh/id_rsa.pub root@host:/root
 	ssh root@10.45.11.29 "mkdir -p .ssh; cat id_rsa.pub >> /root/.ssh/authorized_keys"
 	#即可免密登陆目标主机
@@ -342,6 +347,7 @@ eeooff
 	>\q
 	#导入sql
 	mysql -uroot -p -Ds1-fysg2_data < /data/app/web/s1-fysg2_game_kunlun_com/database/install.sql; 
+	mysql -uroot -pNoNeed4Pass32768 -Dcrusade_999 < /data/app/slg/crusade/db/install.sql
 	>source fullpathfilename;  //执行sql文件
 	#导出sql
 	mysqldump -u dbuser -p dbname > dbname.sql

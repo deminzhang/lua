@@ -283,13 +283,14 @@ int main(int argc, char *argv[], char *envs[])
 	// 父进程退出子进程接SIGKILL信号 !注意linux中线程就是进程
 	if (prctl(PR_SET_PDEATHSIG, SIGKILL)) //必须放在fork()后
 		perror("ERROR prctl");
+	luanet_setsharesock(socks[0]);
 #endif
 	//start lua----------------------------------
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
 	luaopen_extend(L);
 	luaopen_decode(L);
-	luaopen_protobuf(L);
+	luaopen_protobuf_G(L, "proto");
 
 	//global----------------------------------
 	lua_register(L, "_now", lua__now);
@@ -299,11 +300,7 @@ int main(int argc, char *argv[], char *envs[])
 	//other----------------------------------
 	luaopen_queue(L);
 	luaopen_zip(L);
-#ifdef _WIN32
-	luaopen_net(L, 0);
-#else
-	luaopen_net(L, socks[0]);
-#endif
+	luaopen_net_G(L, "_net");
 #ifdef USEPOSTGRES
 	luaopen_postgres(L);
 #endif

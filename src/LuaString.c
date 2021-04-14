@@ -726,7 +726,7 @@ static int lua_str_newBytes(lua_State* L)
 	return 1;
 }
 //reg2lua-------------------------------------------------------
-void lua_openstringEx(lua_State *L)
+LUAEXTEND_API int luaopen_stringEx(lua_State *L)
 {
 	lua_register(L, "_md5sum", lua_md5sum);
 	lua_getglobal(L, "string");
@@ -786,5 +786,6 @@ void lua_openstringEx(lua_State *L)
 		lua_setfield(L, -2, "tostring"); 
 		lua_pushcfunction(L, lua_str_newBytes);
 		lua_setfield(L, -2, "newbyte"); 
-	lua_pop(L, 1);
+	//lua_pop(L, 1);
+	return 1;
 }

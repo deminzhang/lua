@@ -5,6 +5,10 @@
 //#include <memory.h> 
 #include "LuaScript.h"
 
-void lua_openstringEx(lua_State *L);
+#ifndef LUAEXTEND_API
+#define LUAEXTEND_API extern
+#endif
+
+LUAEXTEND_API int luaopen_stringEx(lua_State *L);
 
 #endif

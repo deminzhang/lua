@@ -13,20 +13,19 @@ static int table_new(lua_State *L) {
 	return 1;
 }
 
+#ifdef LUAJIT_VERSION
 static int table_size(lua_State* L)
 {
 	if (!lua_istable(L, 1))
 		lua_errorEx(L, "#1 must table for getsize");
-	lua_sizetable(L, 1); //TODO改的lua
+	lua_sizetable(L, 1); //魔改的lua
 	return 2;
 }
-
-#ifdef LUAJIT_VERSION
 static int table_duplicate(lua_State *L)
 {
 	if (!lua_istable(L, 1))
 		lua_errorEx(L, "#1 must table for duplicate");
-	lua_duplicatetable(L, 1);
+	lua_duplicatetable(L, 1); //魔改的luajit
 	return 1;
 }
 //#else
@@ -143,7 +142,8 @@ static int lua_str_tostring(lua_State*L)
 
 //C api extend-----------------------------------------------------------
 #if !defined LUA_VERSION_NUM || LUA_VERSION_NUM==501
-LUALIB_API void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
+//Adapted from Lua 5.2+
+static void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
 	luaL_checkstack(L, nup, "too many upvalues");
 	for (; l->name != NULL; l++) {  /* fill the table with given functions */
 		int i;
@@ -156,7 +156,7 @@ LUALIB_API void luaL_setfuncs(lua_State *L, const luaL_Reg *l, int nup) {
 }
 #endif
 
-LUA_API char *lua_newBytes(lua_State *L, int size)
+LUAEXTEND_API char *lua_newBytes(lua_State *L, int size)
 {
 	char *u = (char*)lua_newuserdata(L, size);
 	lua_getref(L, _BytesMeta);
@@ -165,7 +165,7 @@ LUA_API char *lua_newBytes(lua_State *L, int size)
 	return u;
 }
 
-LUA_API void lua_setBytesLen(lua_State *L, int idx, size_t len)
+LUAEXTEND_API void lua_setBytesLen(lua_State *L, int idx, size_t len)
 {
 	lua_getref(L, _WeakK_BytesLenth);
 	lua_pushvalue(L, idx>0 ? idx : idx - 1);
@@ -174,7 +174,7 @@ LUA_API void lua_setBytesLen(lua_State *L, int idx, size_t len)
 	lua_pop(L, 1);
 }
 
-LUA_API const char *lua_toBytes(lua_State *L, int idx, size_t *len)
+LUAEXTEND_API const char *lua_toBytes(lua_State *L, int idx, size_t *len)
 {
 	if (lua_isstring(L, idx))
 		return lua_tolstring(L, idx, len);
@@ -197,14 +197,14 @@ LUA_API const char *lua_toBytes(lua_State *L, int idx, size_t *len)
 	return NULL;
 }
 
-LUA_API int lua_errorEx(lua_State *L, const char *format, ...) {
+LUAEXTEND_API int lua_errorEx(lua_State *L, const char *format, ...) {
 	for (int x = 1; luaL_where(L, x), !lua_tostring(L, -1)[0] && x < 10; x++);
 	va_list va; va_start(va, format), lua_pushvfstring(L, format, va), va_end(va);
 	lua_concat(L, 2);
 	return lua_error(L);
 }
 
-LUA_API void lua_regMetatable(lua_State *L, char * type, luaL_Reg *methods, int hangtab)
+LUAEXTEND_API void lua_regMetatable(lua_State *L, char * type, luaL_Reg *methods, int hangtab)
 {
 	luaL_newmetatable(L, type);
 	lua_pushstring(L, type);
@@ -233,7 +233,7 @@ LUA_API void lua_regMetatable(lua_State *L, char * type, luaL_Reg *methods, int 
 	lua_pop(L, 1);
 }
 
-LUA_API void lua_setUserdata(lua_State *L)
+LUAEXTEND_API void lua_setUserdata(lua_State *L)
 {
 	if (!lua_type(L, -1) == LUA_TUSERDATA) {
 		lua_errorEx(L, "need userdata");
@@ -247,7 +247,7 @@ LUA_API void lua_setUserdata(lua_State *L)
 	lua_pop(L, 1); //pop weakv top=o
 }
 
-LUA_API void lua_getUserdata(lua_State *L, void*p)
+LUAEXTEND_API void lua_getUserdata(lua_State *L, void*p)
 {
 	lua_getref(L, _WeakV_PTR2UD);//wv
 	size_t pk = (size_t)p;
@@ -256,7 +256,7 @@ LUA_API void lua_getUserdata(lua_State *L, void*p)
 	lua_remove(L, -2);//u
 }
 
-LUA_API void lua_getfieldUD(lua_State *L, int idx, char *name)
+LUAEXTEND_API void lua_getfieldUD(lua_State *L, int idx, char *name)
 {
 	if (!lua_isuserdata(L, idx))
 		lua_errorEx(L, "lua_getfieldUD #-1 must be userdata");
@@ -273,7 +273,7 @@ LUA_API void lua_getfieldUD(lua_State *L, int idx, char *name)
 	lua_remove(L, -2);//ud,v
 }
 
-LUA_API void lua_setfieldUD(lua_State *L, int idx, char *name)
+LUAEXTEND_API void lua_setfieldUD(lua_State *L, int idx, char *name)
 {
 	if (!lua_isuserdata(L, idx))
 		lua_errorEx(L, "lua_setfieldUD #-1 must be userdata");
@@ -317,7 +317,7 @@ static int debug_getargs(lua_State* L)
 	return lua_gettop(L);
 }
 //debug.stack_dump()
-LUA_API int lua_stackDump(lua_State* L)
+LUAEXTEND_API int lua_stackDump(lua_State* L)
 {
 	int top = lua_gettop(L);
 	printf("[C]dump stack:\n");
@@ -347,8 +347,8 @@ LUA_API int lua_stackDump(lua_State* L)
 
 
 //-------------------------------------------------------------
-LUA_API void luaopen_extend(lua_State *L) {
-	lua_openstringEx(L);
+LUAEXTEND_API int luaopen_extend(lua_State *L) {
+	luaopen_stringEx(L);
 	int weakk, weakv, weakkv;
 	//weakmeta
 	lua_createtable(L, 0, 1); //luaL_newmetatable(L, "WEAKK");
@@ -418,8 +418,10 @@ LUA_API void luaopen_extend(lua_State *L) {
 	lua_getglobal(L, "table");
 		lua_pushcfunction(L, table_new);
 		lua_setfield(L, -2, "new");
+#ifdef LUA_EXTEND_TABLESIZE
 		lua_pushcfunction(L, table_size);
 		lua_setfield(L, -2, "size");
+#endif
 #ifdef LUAJIT_VERSION
 		lua_pushcfunction(L, table_duplicate);
 		lua_setfield(L, -2, "duplicate");
@@ -433,5 +435,5 @@ LUA_API void luaopen_extend(lua_State *L) {
 		lua_setfield(L, -2, "stack_dump");
 
 	lua_pop(L, 1);//pop debug
-
+	return 0;
 }

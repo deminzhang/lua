@@ -1,4 +1,6 @@
 
+--local proto = require("luaextend.proto")
+local proto = _G.proto
 --[[in C===================================================================
 
 --]]
@@ -39,28 +41,6 @@ return _P
 			local f = io.open(proto_path..'/'..fn,'rb')
 			local t = f:read("*a")
 			f:close()
-			-- t = [[
-
--- message TA {
-	-- int32 a = 1;
--- }
--- message TB1 {
-	-- int32 a = 1;
-	-- message TB_2A{
-		-- int32 b = 1;
-		-- message TB3{
-			-- int32 c = 1;
-		-- }
-		-- TB3 f = 2;
-	-- }
-	-- TB_2A d = 2;
-	-- message TB_2B{
-		-- int32 e = 1;
-	-- }
-	-- TB_2B f = 3;
--- }
-
-			-- ]]
 			local n = 0
 			local fw = io.open('proto/'..ff..'.lua','wb')
 			t,n = t:gsub("//(.-)\r\n","--%1\r\n") --comment
@@ -117,6 +97,7 @@ return _P
 	
 end
 
+if proto.field==nil then
 function proto.field(t)
 	local lab = t[1]
 	local tp = t[2]
@@ -128,20 +109,21 @@ function proto.field(t)
 	end
 	local packed = t.packed==nil and 2 or (t.packed and 1 or 0)
 	if _VERSION>='Lua 5.3' then
-		error('Lua 5.3+ open hero else close here')
+		error('Lua 5.3+ open here else close here')
 		--t[0] = lab << 24 + tp << 8 + (t.packed and 1 or 0)
 	elseif jit then --luajit
 		t[0] = bit.lshift(lab, 24) + bit.lshift(tp, 8) + packed
 	else
 		t[0] = lab * math.pow(2,24) + tp * math.pow(2,8) + packed
 	end
-	return t
+end
 end
 
 function proto.import(pname)
 	-- local pack = require(pname)
 	-- return pack
 end
+if proto.Map==nil then
 function proto.Map(ktp,vtp)
 	if type(ktp) == 'table' then
 		ktp = ktp._pbtype
@@ -150,6 +132,7 @@ function proto.Map(ktp,vtp)
 		vtp = vtp._pbtype
 	end
 	return ktp * math.pow(2,16) + vtp
+end
 end
 -- if proto.package==nil then
 function proto.package(pname, syntax)
@@ -295,14 +278,13 @@ function proto.package(pname, syntax)
 end
 -- end
 
-function protobuf_test()
+function protobuf_example()
 	assert(proto,'proto required')
 	dump(proto)
 	local t = {}
 	
 	local fs = proto.protoc('proto/', 'proto/')
 	----------------------------------------------------
-	local proto = proto
 	local OPT, REQ, REP  = proto.OPT, proto.REQ, proto.REP
 	local bool  = proto.bool 
 	local enum  = proto.enum 
@@ -424,4 +406,4 @@ function protobuf_test()
 	end
 	
 end
-protobuf_test()
+protobuf_example()

@@ -98,9 +98,8 @@ static int inet_aton(const char *cp, struct in_addr *inp)
 	return 1;
 }
 static unsigned char WSAStarted = 0; //winsock inited
-#else
-static int sockpair0;
 #endif
+static int sockpair0;
 
 //option set
 static void net_setblocking(SOCKET ps, int blocking) {
@@ -765,113 +764,6 @@ static int luanet_send(lua_State *L)
 	return 0;
 }
 
-
-
-static int luanet_sendBinary(lua_State *L) //ing
-{
-	TCPNet *net = (TCPNet*)luaL_checkudata(L, 1, META_NAME);
-	if (net->state == NETCLOSE) {
-		fprintf(stderr, "net was closed!");
-		return 0;
-	}
-	size_t len = 0;
-	const char *s = (char *)lua_toBytes(L, 2, &len);
-	//const char *buff = (char*)lua_newBytes(L, 1024 * 64);
-	static char buff[1024 * 64];
-	int i;
-	int p = 0;
-	char last = '\0';
-	for (i = 0; i < len; i++) {
-		switch (s[i]) {
-		case 'b'://byte
-			*(char*)(buff + p) = (char)lua_tointeger(L, i + 3);
-			p += sizeof(char);
-		case 'B'://ubyte
-			*(unsigned char*)(buff + p) = (unsigned char)lua_tointeger(L, i + 3);
-			p += sizeof(unsigned char);
-		case 'C'://uchar8
-			*(unsigned char*)(buff + p) = (unsigned char)lua_tointeger(L, i + 3);
-			p += sizeof(unsigned char);
-		case 'c'://char8
-			*(char*)(buff + p) = (char)lua_tointeger(L, i + 3);
-			p += sizeof(char);
-		case 'W'://ushort16
-			*(unsigned short*)(buff + p) = (unsigned short)lua_tointeger(L, i + 3);
-			p += sizeof(unsigned short);
-		case 'w'://short16
-			*(short*)(buff + p) = (short)lua_tointeger(L, i + 3);
-			p += sizeof(short);
-		case 'I'://uint32
-			*(unsigned*)(buff + p) = (unsigned)lua_tointeger(L, i + 3);
-			p += sizeof(unsigned);
-		case 'i'://int32
-			*(int*)(buff + p) = (int)lua_tointeger(L, i + 3);
-			p += sizeof(int);
-		case 'L'://ulong64
-			*(unsigned long long*)(buff + p) = (unsigned long long)lua_tointeger(L, i + 3);
-			p += sizeof(unsigned);
-		case 'l'://long64
-			*(long long*)(buff + p) = (long long)lua_tointeger(L, i + 3);
-			p += sizeof(long long);
-		case 'f'://float
-			*(float*)(buff + p) = (float)lua_tonumber(L, i + 3);
-			p += sizeof(float);
-		case 'd'://double
-			*(double*)(buff + p) = (double)lua_tonumber(L, i + 3);
-			p += sizeof(double);
-		case 's'://string<256
-		{
-			size_t lens = 0;
-			const char *ss = lua_toBytes(L, i + 3, &lens);
-			if (lens > sizeof(unsigned char))
-				lua_errorEx(L, "s require string max 255, got %d", lens);
-			memcpy((void*)(buff + p), ss, lens);
-			p += lens;
-		}
-		case 'S'://string<65536
-		{
-			size_t lens = 0;
-			const char *ss = lua_toBytes(L, i + 3, &lens);
-			if (lens > sizeof(unsigned short))
-				lua_errorEx(L, "S require string max 65536, got %d", lens);
-			memcpy((void*)(buff + p), ss, lens);
-			p += lens;
-		}
-		case 'M'://string<unit
-		{
-			size_t lens = 0;
-			const char *ss = lua_toBytes(L, i + 3, &lens);
-			if (lens > sizeof(unsigned))
-				lua_errorEx(L, "M require string max uint, got %d", lens);
-			memcpy((void*)(buff + p), ss, lens);
-			p += lens;
-		}
-		//case '0': case '1':
-		case '2': case '3': case '4': case '5':
-		case '6': case '7': case '8': case '9':
-			//repeat last times as atoi(last)-1;
-			//break;
-		case '{'://tableBegin
-
-			//break;
-		case '}'://tableEnd
-
-			//break;
-		case '['://arrayBegin
-
-				 //break;
-		case ']'://arrayEnd
-
-				 //break;
-		default:
-			lua_errorEx(L, "invalid data type, got %s", s[i]);
-			break;
-		}
-		last = s[i];
-	}
-	send(net->sock, buff, len, 0);
-	return 0;
-}
 static int luanet_setnodelay(lua_State *L)
 {
 	TCPNet *net = (TCPNet*)luaL_checkudata(L, 1, META_NAME);
@@ -1289,7 +1181,7 @@ static int luanet_connect(lua_State *L)
 }
 
 //global
-LUA_API void luanet_loop(lua_State *L)
+LUAEXTEND_API void luanet_loop(lua_State *L)
 {
 #ifdef USENETEPOLL
 	net_epolling(L);
@@ -1302,7 +1194,11 @@ LUA_API void luanet_loop(lua_State *L)
 	lua_settop(L, 0);
 }
 
-LUA_API void luaopen_net(lua_State *L, int sock0) {
+LUAEXTEND_API void luanet_setsharesock(int sock0) {
+	sockpair0 = sock0;
+}
+
+LUAEXTEND_API void luaopen_net_G(lua_State *L, const char* name) {
 	//init
 #ifdef _WIN32
 	if (!WSAStarted) {
@@ -1320,7 +1216,6 @@ LUA_API void luaopen_net(lua_State *L, int sock0) {
 	//printf("Net Use select\n");
 	signal(SIGPIPE, SIG_IGN);
 #endif
-	sockpair0= sock0;
 #endif
 
 	//static local-------------------------------------
@@ -1370,6 +1265,75 @@ LUA_API void luaopen_net(lua_State *L, int sock0) {
 
 	lua_pushcfunction(L, luanet_hostips);
 	lua_setfield(L, -2, "hostips");
-	lua_setglobal(L, "_net");
+	lua_setglobal(L, name);
+}
+LUAEXTEND_API int luaopen_net(lua_State *L) {
+	//init
+#ifdef _WIN32
+	if (!WSAStarted) {
+		WSADATA wsd;
+		if (WSAStartup(0x0202, &wsd) == SOCKET_ERROR) {
+			WSACleanup();
+			lua_errorEx(L, "Init Socket Failed!");
+		}
+	}
+#else
+#ifdef USENETEPOLL
+	//printf("Net Use EPOLL\n");
+	epoll_fd = epoll_create(EPOLLFD_SIZE);
+#else
+	//printf("Net Use select\n");
+	signal(SIGPIPE, SIG_IGN);
+#endif
+#endif
+
+	//static local-------------------------------------
+	_Listeners = NULL;
+	_Nets = NULL;
+	_Buf = lua_newBytes(L, BUFFERSIZE);
+	lua_setBytesLen(L, -1, 0);
+	_BufIdx = lua_ref(L, -1);
+	//reg to lua-------------------------------------
+	struct luaL_Reg methods[] = {
+		{ "__gc",   luanet_gc },
+		{ "close",  luanet_close },
+		{ "closed", luanet_closed },
+		{ "receive",luanet_setReceive },
+		{ "send", 	luanet_send },
+		//{ "sendbin", 	luanet_sendBinary },
+		{ "nagle", 	luanet_setnodelay },
+		{ "share", 	luanet_share },
+		{ "getfd",  luanet_getfd },
+		{ "macaddr",luanet_macaddr },
+		//{ "setfd",  luanet_setfd },
+		//{ "getpeername", luanet_getpeername },
+		//{ "getsockname", luanet_getsockname },
+		//{ "setonlisten", luanet_setonlisten },
+		//{ "setonclose",  luanet_setonclose 
+		//{ "setonconnect",luanet_setonconnect },
+
+		{ NULL, NULL },
+	};
+	lua_regMetatable(L, META_NAME, methods, 1);
+	//_G
+	//luaL_getmetatable(L, META_NAME);
+	//lua_pushcclosure(L, luanet_listen, 1), lua_setglobal(L, "_listen");
+	//luaL_getmetatable(L, META_NAME);
+	//lua_pushcclosure(L, luanet_connect, 1), lua_setglobal(L, "_connect");
+	//lua_register(L, "_hostips", luanet_hostips);
+
+	lua_createtable(L, 0, 4);
+#ifndef CLIENT
+	luaL_getmetatable(L, META_NAME);
+	lua_pushcclosure(L, luanet_listen, 1);
+	lua_setfield(L, -2, "listen");
+#endif
+	luaL_getmetatable(L, META_NAME);
+	lua_pushcclosure(L, luanet_connect, 1);
+	lua_setfield(L, -2, "connect");
+
+	lua_pushcfunction(L, luanet_hostips);
+	lua_setfield(L, -2, "hostips");
+	return 1;
 }
 

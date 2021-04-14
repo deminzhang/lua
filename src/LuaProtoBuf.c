@@ -40,7 +40,6 @@
 #define MAX_CODE_LEN 0xfff0		//max len of code buffer 最大编码长度
 
 #define META_NAME "[PROTOBUF]"
-#define GLOBAL_LIB_NAME "proto"
 
 typedef struct {
 	int wire;		//类型对应WIRE类型
@@ -657,14 +656,66 @@ static int lua_protoc(lua_State* L)
 	return 0;
 }
 
+//function proto.field(t)
+//	local lab = t[1]
+//	local tp = t[2]
+//	if type(t[2]) == 'table' then
+//		tp = t[2]._pbtype
+//		if tp > 0xffff then
+//			lab = proto.MAP
+//		end
+//	end
+//	local packed = t.packed==nil and 2 or (t.packed and 1 or 0)
+//	if _VERSION>='Lua 5.3' then
+//		error('Lua 5.3+ open here else close here')
+//		--t[0] = lab << 24 + tp << 8 + (t.packed and 1 or 0)
+//	elseif jit then --luajit
+//		t[0] = bit.lshift(lab, 24) + bit.lshift(tp, 8) + packed
+//	else
+//		t[0] = lab * math.pow(2,24) + tp * math.pow(2,8) + packed
+//	end
+//end
+static int lua_proto_field(lua_State * L)
+{
+	if (!lua_istable(L, 1))
+		lua_errorEx(L, "#1 must table for proto field");
+	lua_rawgeti(L, 1, 1);
+	int lab = lua_tointeger(L, -1);
+	lua_rawgeti(L, 1, 2);
+	int tp;
+	if (lua_istable(L, -1)) {
+		lua_getfield(L, -1, "_pbtype");
+		tp = lua_tointeger(L, -1);
+		if (tp > 0xffff)
+			tp = LAB_MAP;
+	}
+	else {
+		tp = lua_tointeger(L, -1);
+	}
+	int packed;
+	lua_getfield(L, 1, "packed");
+	if (lua_isnil(L, -1)) 
+		packed = 2;
+	else
+		packed = lua_toboolean(L, -1);
+
+	int v0 = (lab << 24) + (tp << 8) + packed;
+	lua_pushinteger(L, v0);
+	lua_rawseti(L, 1, 0);
+	return 0;
+}
+
 static int lua_proto_package(lua_State* L) 
 {
 	//in lua
+	//luaL_dostring("");
+	return 0;
 }
 
 static int lua_proto_import(lua_State* L) 
 {
 	//in lua
+	return 0;
 }
 
 static int lua_proto_utils(lua_State* L)
@@ -689,7 +740,7 @@ static int lua_definemap(lua_State* L)
 	return 1;
 }
 
-LUA_API void luaopen_protobuf(lua_State* L)
+LUAEXTEND_API int luaopen_protobuf(lua_State* L)
 {
 	init();
 
@@ -706,15 +757,15 @@ LUA_API void luaopen_protobuf(lua_State* L)
 	lua_pushinteger(L, LAB_REP), lua_setfield(L, -2, "REP");
 	lua_pushinteger(L, LAB_REQ), lua_setfield(L, -2, "REQ");
 	lua_pushinteger(L, LAB_MAP), lua_setfield(L, -2, "MAP");
-
+	/*metatable*/
 	lua_createtable(L, 0, 0);
-		lua_createtable(L, 0, 22);
-		for (int i = 0; i < 22; i++)
-			if (ProtoType[i].name != NULL)
-				lua_pushinteger(L, i), lua_setfield(L, -2, ProtoType[i].name);
-		lua_setfield(L, -2, "__index");
+	lua_createtable(L, 0, 22);
+	for (int i = 0; i < 22; i++)
+		if (ProtoType[i].name != NULL)
+			lua_pushinteger(L, i), lua_setfield(L, -2, ProtoType[i].name);
+	lua_setfield(L, -2, "__index");
 	lua_setmetatable(L, -2);
-
+	/*packedType*/
 	lua_createtable(L, 0, 22);
 	for (int i = 0; i < 22; i++) {
 		if (ProtoType[i].packed)
@@ -722,7 +773,13 @@ LUA_API void luaopen_protobuf(lua_State* L)
 	}
 	lua_setfield(L, -2, "packedType");
 
-	lua_setglobal(L, GLOBAL_LIB_NAME);
 	//方便用lua写的
-	lua_proto_utils(L);
+	return 1;
+}
+
+LUAEXTEND_API int luaopen_protobuf_G(lua_State* L, const char* name)
+{
+	luaopen_protobuf(L);
+	lua_setglobal(L, name);
+	return 0;
 }

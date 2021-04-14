@@ -35,12 +35,11 @@
 	#include <netinet/tcp.h>
 #endif
 
-//#include <stdlib.h>
-//#include <stdio.h>
-//#include <time.h> 
 #include "LuaScript.h"
 
-LUA_API void luanet_loop(lua_State *L);
-LUA_API void luaopen_net(lua_State *L, int sock0);
+LUAEXTEND_API void luanet_loop(lua_State *L);
+LUAEXTEND_API void luanet_setsharesock(int sock0);
+LUAEXTEND_API void luaopen_net_G(lua_State *L, const char*s);
+LUAEXTEND_API int luaopen_net(lua_State *L);
 
 #endif

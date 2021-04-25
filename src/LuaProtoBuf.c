@@ -254,9 +254,10 @@ static size_t encode_tab(lua_State* L, char *buf)
 		lua_rawgeti(L, top, i);//field=fields[i]
 		if (lua_isnil(L, -1)) break;
 		//ff ff ff ff lab tpk tpv packed
-		lua_rawgeti(L, top + 1, 0);//field[1] lab
+		lua_rawgeti(L, top + 1, 0);//field[0]
 		int lab0 = lua_tointeger(L, -1);
 		lua_pop(L, 1);
+
 		int lab = lab0 >> 24;
 		int tp = lab0 >> 8 & 0xffff;
 		int packed0 = lab0 & 0xff;
@@ -356,7 +357,8 @@ static int lua_proto_encode(lua_State* L)
 	if (len > MAX_CODE_LEN) 
 		lua_errorEx(L, "protobuf encode tolong %d", len);
 	
-	if (len == 0)return 0;
+	//if (len == 0)
+	//	return 0;
 	char* buff1 = (char*)lua_newBytes(L, len);
 	memcpy(buff1, buf, len);
 	free(buf);
@@ -596,6 +598,7 @@ static int lua_proto_decode(lua_State* L)
 
 		lua_rawgeti(L, 5, 2);//field[2] TP
 		lua_rawgeti(L, 5, 3); //field[3] name
+		const char* name = lua_tostring(L, -1);
 		switch (lab)
 		{
 		case LAB_REP: 
@@ -632,8 +635,8 @@ static int lua_proto_decode(lua_State* L)
 				lua_settable(L, 1);//t[name]=tab
 			}
 			int plen = DecodeVarint(L, buf, &p);
-			int tpk = tp >> 16;
-			int tpv = tp & 0xffff;
+			int tpk = tp >> 8;
+			int tpv = tp & 0xff;
 			p++;//sub fn1
 			DecodeFieldVal(L, tpk, buf, &p);
 			p++;//sub fn2
@@ -708,18 +711,21 @@ static int lua_proto_field(lua_State * L)
 static int lua_proto_package(lua_State* L) 
 {
 	//in lua
+	lua_errorEx(L, "TODO now in lua");
 	//luaL_dostring("");
 	return 0;
 }
 
 static int lua_proto_import(lua_State* L) 
 {
+	lua_errorEx(L, "TODO now in lua");
 	//in lua
 	return 0;
 }
 
 static int lua_proto_utils(lua_State* L)
 {
+	lua_errorEx(L, "TODO now in lua");
 	//luaL_dostring(L,"");
 	return 0;
 }
@@ -736,7 +742,7 @@ static int lua_definemap(lua_State* L)
 	}
 	int ktp = lua_tointeger(L, 1);
 	int vtp = lua_tointeger(L, 2);
-	lua_pushinteger(L, ktp << 16 | vtp);
+	lua_pushinteger(L, ktp << 8 | vtp);
 	return 1;
 }
 

@@ -786,6 +786,6 @@ LUAEXTEND_API int luaopen_stringEx(lua_State *L)
 		lua_setfield(L, -2, "tostring"); 
 		lua_pushcfunction(L, lua_str_newBytes);
 		lua_setfield(L, -2, "newbyte"); 
-	//lua_pop(L, 1);
+	lua_pop(L, 1);
 	return 1;
 }

@@ -56,7 +56,7 @@ function Role.byGUID(guid) return guid2Role[guid] end
 function Role.byPID(pid) return pid2Role[pid] end
 function Role.all() return token2Role end
 function Role.new(data, token, temp) --temp:用于计算的临时对象
-	local o = _new(true)
+	local o = _new()
 	local guid = Object.newGuid()
 	o.guid 			= guid
 	o.pid 			= data.player.pid

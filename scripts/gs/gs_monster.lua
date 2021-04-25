@@ -32,12 +32,12 @@ function event.loadConfig()
 end
 function Monster.new(id)
 	local cfg = cfg_mon[id]
-	local o = _new(true)
+	local o = _new()
 	local guid = Object.newGuid()
 	o.guid 			= guid
 	o.id 			= id
 	o.bornTime 		= _now()
-	--set often use functions directly
+	--set frequently use functions directly
 	o.update 		= Monster.update
 	o.updateAI 		= Monster.updateAI
 	o.setPos 		= Unit.setPos
@@ -52,7 +52,7 @@ function Monster.new(id)
 	
 	Attr.add(o, cfg, true, 'new') --TEST
 	Attr.reset(o, 'rolenew', true) --属性池计算
-	o:setv('hp', o:getv'maxHp' )
+	o:setv('hp', o:getv'maxHp' )	--加满血
 
 	return o
 end

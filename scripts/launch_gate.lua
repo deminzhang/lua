@@ -1,6 +1,6 @@
 --os.info.listen = '*:port'
 
-assert(os.info.system=='linux','net:share unsupported in '..os.info.system)
+assert(os.info.system=='linux','net:share only supported in linux')
 
 if not os.info.subgate then --main gate listen
 	local random = math.random

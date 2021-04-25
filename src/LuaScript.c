@@ -28,7 +28,6 @@ static int table_duplicate(lua_State *L)
 	lua_duplicatetable(L, 1); //Ä§¸ÄµÄluajit
 	return 1;
 }
-//#else
 #endif // LUAJIT_VERSION
 
 //return wk[ud] and wk[ud][k] or meta[k]
@@ -418,10 +417,8 @@ LUAEXTEND_API int luaopen_extend(lua_State *L) {
 	lua_getglobal(L, "table");
 		lua_pushcfunction(L, table_new);
 		lua_setfield(L, -2, "new");
-#ifdef LUA_EXTEND_TABLESIZE
 		lua_pushcfunction(L, table_size);
 		lua_setfield(L, -2, "size");
-#endif
 #ifdef LUAJIT_VERSION
 		lua_pushcfunction(L, table_duplicate);
 		lua_setfield(L, -2, "duplicate");

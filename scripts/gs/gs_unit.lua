@@ -26,7 +26,7 @@ local counts = table.new(0,8)	--[utype] = count
 ----------------------------------------------------------------
 ----------------------------------------------------------------
 --Unit.
-function Unit.new(isFight,temp)	--isFight:初始化战斗属性,temp:不分配guid
+function Unit.new(isFight,temp)	--isFight:初始化战斗属性,temp:临时计算用不分配guid
 	local guid = temp and 0 or Object.newGuid()
 	local o = {
 		--property
@@ -52,14 +52,14 @@ function Unit.new(isFight,temp)	--isFight:初始化战斗属性,temp:不分配gu
 		-- update			= Unit.update,
 		-- setPos 			= Unit.setPos,
 		-- getRoundRoles	= Unit.getRoundRoles,
-		reftrace = '',
+		reftrace = '',		--debug上次引用traceback
 	}
 	setmetatable(o, _meta)
 	o:def('guid','never',guid)
 	o:def('name','never','')
 	o:def('type','never','unit')
 	o:def('camp','rare',0)					--阵营
-	o:def('pos','oftenX',{x=0,y=0,z=0,r=0})	--当前位置
+	o:def('pos','often',{x=0,y=0,z=0,r=0})	--当前位置
 	o:def('sizeR','never',5)				--贴身半径
 	o:def('visible','rare',true)			--可见
 	o:def('active','rare',true)				--激活
@@ -82,7 +82,6 @@ function Unit.new(isFight,temp)	--isFight:初始化战斗属性,temp:不分配gu
 		-- o.combatState = COMBATSTATE.IMCOMBAT
 
 	end
-	--计算用临时单位不引用
 	return o
 end
 _meta.__call = Unit.new
@@ -183,9 +182,7 @@ function Unit:getData()	--打包编码给前端
 	local encodes = self.sync_encodes
 	for k, v in pairs(self.sync_groups) do
 		if not encodes[k] then
-			--优化:按变化频率分组,组无变的多次用不重编码
-			-- encodes[k] = v	--旧
-			encodes[k] = _encode(v) --新 
+			encodes[k] = _encode(v)
 		end
 	end
 	return encodes

@@ -100,32 +100,6 @@ return _P
 	return fs
 end
 
-if proto.field==nil then
-function proto.field(t)
-	local lab = t[1]
-	local tp = t[2]
-	if type(t[2]) == 'table' then
-		tp = t[2]._pbtype
-	end
-	if tp > 0xff then
-		lab = proto.MAP
-		-- t[1] = lab
-	end
-	local packed = t.packed==nil and 2 or (t.packed and 1 or 0)
-	if _VERSION>='Lua 5.3' then
-		error('Lua 5.3+ open here else close here')
-		--t[0] = lab << 24 + tp << 8 + (t.packed and 1 or 0)
-	elseif jit then --luajit
-		if not lab or not tp then
-			dump(t)
-		end
-		t[0] = bit.rol(lab, 24) + bit.rol(tp, 8) + packed
-	else
-		t[0] = lab * math.pow(2,24) + tp * math.pow(2,8) + packed
-	end
-end
-end
-
 function proto.import(pname)
 	local pack = require(pname)
 	return pack
@@ -205,69 +179,7 @@ function proto.package(pname, syntax)
 				setmetatable(msg, _meta)
 				return msg
 			end,
-			--忘了,好象是备份
-			enum = setmetatable({},{__newindex=function(self, name, enum)
-				-- assert(pack[name]==nil,name..' already defined in package '..pname)
-				local value = {}
-				for k,v in pairs(enum) do
-					assert(pack[v]==nil,k..' already defined in package '..pname)
-					assert(value[v]==nil,name..' duplicated enum value:'..v)
-					assert(math.floor(v)==v, name..' enum value must be int32'..v)
-					value[v] = k
-					pack[v] = k
-				end
-				local _meta = {__index={_pbtype = proto.enum, value=value}}
-				setmetatable(enum,_meta)
-				
-				rawset(pack,name,enum)
-				return enum
-			end}),
-			message = setmetatable({},{__newindex=function(self, name, msg)
-				-- assert(pack[name]==nil,name..' already defined in package '..pname)
-				local fields = {} 
-				for _,v in ipairs(msg) do
-					local flab = v[1]
-					local ftp = v[2]
-					if type(ftp)=='table' then
-						ftp = ftp._pbtype
-					end
-					local fname = v[3]
-					local fn = v[4]
-					assert(fields[fn]==nil,name..' duplicated field:'..fn)
-					proto.field(v)
-					
-					if syntax=='proto3' then
-						assert(v[1]==proto.OPT or v[1]==proto.REP, 'proto3 unsupported '..fname)
-						assert(v.default==nil,'[default] proto3 unsupported')
-					end
-					if ftp>0xffff and flab~=proto.OPT then
-						error('Field labels are not allowed on map fields')
-					end
-					if not proto.packedType[ftp] then
-						assert(v.packed~=true, '[packed=] can only be specified for repeated primitive fields:'..fname)
-					end
-					fields[fn] = v 
-				end
-				local _meta = {syntax = syntax, message = msg, fields = fields}
-				_meta.__index = {_pbtype = proto.message, encode = proto.encode, decode = proto.decode}
-				if syntax~='proto3' then
-					_meta.__index.decode = function(msg,buf)
-						local r = proto.decode(msg,buf)
-						for i,v in pairs(msg) do
-							if r[v[3]]==nil and v.default~=nil then
-								r[v[3]] = v.default
-							end
-						end
-					end
-				end
-				_meta.__call = function(self,t)
-					return setmetatable(t, getmetatable(self))
-				end
-				setmetatable(msg, _meta)
-				rawset(pack,name,msg)
-				return msg
-			end}),
-			
+
 		},
 	})
 end
@@ -284,43 +196,46 @@ end
 function protobuf_example()
 	assert(proto,'proto required')
 	proto.protoc('proto/', 'proto/')
-	local protos = require('proto/test2')
+	local protos = require('proto/test')
 	
 	local b = protos.TestType.TestChild{
 		Fsint64 = 123,
 	}:encode()
 	print("TestChild:",b)
 	local t0 = protos.TestType{
-		-- Fint32 = 0x7FFFffff,
-		-- Fint64 = 0x7FFFffffFFFFffff,
-		-- Fuint32 = 4294967295.0,
-		-- Fuint64 = 123000000000,
-		-- Fsint32 = -123000000,
-		-- Fsint64 = 123000000000,
-		-- Ffixed32 = -123000000,
-		-- Ffixed64 = 12300000000,
-		-- Fdouble = math.pi, 
-		-- Ffloat = math.pi,
-		-- Fbool = true,
-		-- Fstring = "abcde",
-		-- Fbytes = 'abc',
-		-- Fsfixed32 = -123000000,
-		-- Fsfixed64 = -12300000000,
-		-- Frepeatbool = {true, false, true},
-		-- Frepeatbool2 = {true, false, true},
-		-- Frepeatint = {255, 65536},
-		-- Frepeatint2 = {255, 65536},
-		-- Fstring2 = {"","abcd"},
-		-- Fenum = protos.TestEnum.SUNDAY,
-		-- Fmessage = protos.TestType.TestChild{
-			-- Fsint64 = 123,
-		-- },
-		-- Frepc = {protos.TestType.TestChild{
-			-- Fsint64 = 123,
-		-- },protos.TestType.TestChild{
-			-- Fsint64 = 234,
-		-- }},
-		Fmap = {[3]=7,[6]=5},
+		Fint32 = 0x7FFFffff,
+		Fint64 = 0x7FFFffffFFFFffff,
+		Fuint32 = 4294967295.0,
+		Fuint64 = 123000000000,
+		Fsint32 = -123000000,
+		Fsint64 = 123000000000,
+		Ffixed32 = -123000000,
+		Ffixed64 = 12300000000,
+		Fdouble = math.pi, 
+		Ffloat = math.pi,
+		Fbool = true,
+		Fstring = "abcde",
+		Fbytes = 'abc',
+		Fsfixed32 = -123000000,
+		Fsfixed64 = -12300000000,
+		Frepeatbool = {true, false, true},
+		Frepeatbool2 = {true, false, true},
+		Frepeatint = {255, 65536},
+		Frepeatint2 = {255, 65536},
+		Fstring2 = {"","abcd"},
+		Fenum = protos.TestEnum.SUNDAY,
+		Fmessage = protos.TestType.TestChild{
+			Fsint64 = 123,
+		},
+		Frepc = {protos.TestType.TestChild{
+			Fsint64 = 123,
+		},protos.TestType.TestChild{
+			Fsint64 = 234,
+		}},
+		Fmap = {
+		[3]=7,
+		[6]=5
+		},
 	}
 	-- dump(protos.TestType)
 	-- dump(t0)
@@ -336,4 +251,4 @@ function protobuf_example()
 	end
 	
 end
-protobuf_example()
+--protobuf_example()

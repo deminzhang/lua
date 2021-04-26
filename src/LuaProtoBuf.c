@@ -258,8 +258,10 @@ static size_t encode_tab(lua_State* L, char *buf)
 		int lab0 = lua_tointeger(L, -1);
 		lua_pop(L, 1);
 
-		int lab = lab0 >> 24;
 		int tp = lab0 >> 8 & 0xffff;
+		int tpk = tp >> 8;
+		int tpv = tp & 0xff;
+		int lab = tpk > 0 ? LAB_MAP : lab0 >> 24;
 		int packed0 = lab0 & 0xff;
 		int packed = ProtoType[tp].packed && (packed0 == 2 ? (proto2 ? 0 : 1) : packed0);
 
@@ -276,8 +278,6 @@ static size_t encode_tab(lua_State* L, char *buf)
 		switch (lab) {
 		case LAB_MAP:
 			if (vtp == LUA_TNIL) continue;
-			int tpk = tp >> 16;
-			int tpv = tp & 0xffff;
 			int wirek = ProtoType[tpk].wire;
 			int wirev = ProtoType[tpv].wire;
 			for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -591,8 +591,10 @@ static int lua_proto_decode(lua_State* L)
 		lua_rawgeti(L, 5, 0);//field[1] lab
 		int lab0 = lua_tointeger(L, -1);
 		lua_pop(L, 1);
-		int lab = lab0 >> 24;
 		int tp = lab0 >> 8 & 0xffff;
+		int tpk = tp >> 8;
+		int tpv = tp & 0xff;
+		int lab = tpk > 0 ? LAB_MAP : lab0 >> 24;
 		int packed0 = lab0 & 0xff;
 		int packed = ProtoType[tp].packed && (packed0 == 2 ? (proto2 ? 0 : 1) : packed0);
 
@@ -635,8 +637,6 @@ static int lua_proto_decode(lua_State* L)
 				lua_settable(L, 1);//t[name]=tab
 			}
 			int plen = DecodeVarint(L, buf, &p);
-			int tpk = tp >> 8;
-			int tpv = tp & 0xff;
 			p++;//sub fn1
 			DecodeFieldVal(L, tpk, buf, &p);
 			p++;//sub fn2
@@ -659,25 +659,7 @@ static int lua_protoc(lua_State* L)
 	return 0;
 }
 
-//function proto.field(t)
-//	local lab = t[1]
-//	local tp = t[2]
-//	if type(t[2]) == 'table' then
-//		tp = t[2]._pbtype
-//		if tp > 0xffff then
-//			lab = proto.MAP
-//		end
-//	end
-//	local packed = t.packed==nil and 2 or (t.packed and 1 or 0)
-//	if _VERSION>='Lua 5.3' then
-//		error('Lua 5.3+ open here else close here')
-//		--t[0] = lab << 24 + tp << 8 + (t.packed and 1 or 0)
-//	elseif jit then --luajit
-//		t[0] = bit.lshift(lab, 24) + bit.lshift(tp, 8) + packed
-//	else
-//		t[0] = lab * math.pow(2,24) + tp * math.pow(2,8) + packed
-//	end
-//end
+//t[0] = t[1]<<24 + t[2]<<8 + packed
 static int lua_proto_field(lua_State * L)
 {
 	if (!lua_istable(L, 1))
@@ -753,6 +735,8 @@ LUAEXTEND_API int luaopen_protobuf(lua_State* L)
 	lua_createtable(L, 0, 2);
 	lua_pushcfunction(L, lua_definemap);
 	lua_setfield(L, -2, "Map");
+	lua_pushcfunction(L, lua_proto_field);
+	lua_setfield(L, -2, "field");
 	lua_pushcfunction(L, lua_proto_decode);
 	lua_setfield(L, -2, "decode");
 	lua_pushcfunction(L, lua_proto_encode);

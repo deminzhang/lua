@@ -19,6 +19,7 @@ function debug.print(...)
 end
 --_G.print = debug.print --show where print
 
+--树形打印表
 local dumptab = {}
 local push = table.push
 local io_write = io.write
@@ -62,11 +63,11 @@ local function _dump(t,depth,lv,keysub)
 		end
 	end
 	if tt=='table' then
-		local idx = rawget(t,__index)
+		local idx = rawget(t,"__index")
 		if idx then
 			write(lv,"  __index"," = ",tostring(idx),"\n")
 		end
-		local newidx = rawget(t,__newindex)
+		local newidx = rawget(t,"__newindex")
 		if idx then
 			write(lv,"  __newindex"," = ",tostring(newidx),"\n")
 		end
@@ -152,7 +153,7 @@ debug.dump = dump
 function debug.gc()
 	collectgarbage('collect')
 end
-
+--查找upvalue
 function debug.findupvalue(func, name)
 	for i=1,math.huge do
 		local k, v = debug.getupvalue(func, i)
@@ -162,7 +163,7 @@ function debug.findupvalue(func, name)
 		end
 	end
 end
-
+--更改upvalue
 function debug.resetupvalue(func,name,newval)
 	for i=1,math.huge do
 		local k = debug.getupvalue(func, i)
@@ -174,6 +175,7 @@ function debug.resetupvalue(func,name,newval)
 	end
 end
 
+--查看对象引用
 --debug.findobj( _G, function(o)return o==? end, '_G' ) 
 --debug.findobj( debug.getregistry(), function(o)return o==? end, '_REG') 
 function debug.findobj( start, comp, root )
@@ -266,9 +268,10 @@ function debug.findobj( start, comp, root )
 	return res
 end
 
+--统计性能,maxsec时间
 local clock = os.clock
 local getinfo = debug.getinfo
-function debug.profiler(maxsec, logfile) --统计性能,maxsec时间
+function debug.profiler(maxsec, logfile) 
 	local t0 = clock()
 	local t = {}
 	debug.sethook(function(type,...)
@@ -309,7 +312,7 @@ function debug.profiler(maxsec, logfile) --统计性能,maxsec时间
 		end
 	end, "cr")
 end
-
+--死循环查找
 function debug.loopfind()
 	local t0 = clock()
 	local t = {}
@@ -348,4 +351,4 @@ end
 -- local s= string.gsub(s,'(while)(.-)(do)', 'WHITLE()%1%2%3 DO()')
 -- local s= string.gsub(s,'(repeat)(.-)(until)', 'RPT()%1 UTL()%2%3')
 -- print(s)
-
+-- error('teststop')

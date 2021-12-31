@@ -137,7 +137,18 @@ local function _event(define,use_G,event,when,call)
 			return self
 		end,
 	})
-	local event_reg = setmetatable({},{
+	local event_set = function(filter) --筛选器/预定义_order
+		local tt = type(filter)
+		assert(tt=='table','bad argument #1(table expected, got '..tt..')')
+		_filter = filter
+		return event_reg
+	end
+	local event_call = setmetatable({}, {__index = defined})
+	local event_reg = setmetatable({
+		_define = event_def,
+		_when = event_set,
+		_call = event_call,
+	},{
 		__index = defined,
 		__newindex = function(self,name,func)
 			local e = events[name]
@@ -200,13 +211,6 @@ local function _event(define,use_G,event,when,call)
 			return self
 		end,
 	})
-	local event_set = function(filter) --筛选器/预定义_order
-		local tt = type(filter)
-		assert(tt=='table','bad argument #1(table expected, got '..tt..')')
-		_filter = filter
-		return event_reg
-	end
-	local event_call = setmetatable({}, {__index = defined})
 	----------------------------------------------------------------
 	if use_G then
 		setmetatable(_G, {

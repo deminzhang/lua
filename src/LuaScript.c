@@ -12,8 +12,6 @@ static int table_new(lua_State *L) {
 	lua_createtable(L, narr<0 ? 0 : narr, nrec<0 ? 0 : nrec);
 	return 1;
 }
-
-#ifdef LUAJIT_VERSION
 static int table_size(lua_State* L)
 {
 	if (!lua_istable(L, 1))
@@ -21,6 +19,7 @@ static int table_size(lua_State* L)
 	lua_sizetable(L, 1); //Ä§¸ÄµÄlua
 	return 2;
 }
+#ifdef LUAJIT_VERSION
 static int table_duplicate(lua_State *L)
 {
 	if (!lua_istable(L, 1))

@@ -66,12 +66,14 @@ typedef struct TCPNet {
 	int forceref;//Listener在没close前/异步connect回调前 防回收的强引用
 	char *seps[4];
 	int sepsref[4];
+	//int bufIdx; //TODO private use
+	//char* buf; //TODO private use
 	struct TCPNet *next;
 } TCPNet;
 
 static TCPNet *_Listeners = NULL;
 static TCPNet *_Nets = NULL;	//非listener
-static char *_Buf = NULL; //reuse
+static char *_Buf = NULL; //单线程复用reuse
 static int _BufIdx = 0;
 #ifdef USENETEPOLL
 static int epoll_fd;
@@ -286,8 +288,6 @@ static void net_accept(lua_State *L, TCPNet *listener)
 
 		if (taken){
 			lua_getref(L, _BufIdx);
-			//lua_pushinteger(L, taken);
-			//lua_setfieldUD(L, -2, "._lenth");
 			lua_setBytesLen(L, -1, taken);
 		}
 		else
@@ -341,8 +341,6 @@ static void net_receive(lua_State *L, TCPNet *net)
 		lua_pushlstring(L, _Buf, taken);
 	else {
 		lua_getref(L, _BufIdx);//TODO 复用buff 如果lua中保存 要拷贝
-		//lua_pushinteger(L, taken);
-		//lua_setfieldUD(L, -2, "._lenth");
 		lua_setBytesLen(L, -1, taken);
 	}
 	//beforecall
@@ -413,8 +411,6 @@ static void net_receiveSep(lua_State *L, TCPNet *net)
 		lua_pushlstring(L, _Buf, taken);
 	else{
 		lua_getref(L, _BufIdx);//TODO 复用buff 如果lua中保存 要拷贝
-		//lua_pushinteger(L, taken);
-		//lua_setfieldUD(L, -2, "._lenth");
 		lua_setBytesLen(L, -1, taken);
 	}
 

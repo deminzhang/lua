@@ -187,18 +187,28 @@ fi
 	svn checkout --username demin_zhang --password ********** http://code.taobao.org/svn/luaserver 
 	
 ##GIT--------------------------
-	git --version
+
+	yum -y install git #安装
+	git --version #版本
+	yum remove git #卸载
+	
 	git init
 	git config --global user.name "yongjian.liu"
 	git config --global user.email "11.29"  
 	git config user.name "yongjian.liu"  
 	git config user.email "11.29"  
-	git clone git@10.4.0.27:Crusade/Server.git
-	git remote add origin https://xxx.git  
+	
+	git clone git@10.4.0.27:Crusade/Server.git #从远程库clone
+	
+	git remote add origin https://xxx.git  		#创建远程库
+	git push origin master #push到远程
+	
 	git pull origin master
-	git pull #拉remote库
+	git pull #拉remote库并合并
+	git fetch --all  #1拉而不合
+	git reset --hard origin/master #2强制重置跟远程库一样(等效于SVN删掉文件重update)
 	git branch #查看本地分支 *为当前所用
-	git branch bname #创建分支
+	git branch dev #创建分支
 	git checkout bname #切换分支
 	git branch -D bname	#删除本地分支
 	git checkout -b bname origin/bname #拉远程分支
@@ -207,13 +217,14 @@ fi
 	git commit -m "说明" 	#提交add过的
 	git mv -f oldname newname #重命名
 	git add -u newname #-u选项会更新已经追踪的文件和文件夹
+	git status # 查看修改状态
 	git commit -m "rename"
 	git push origin master #push到远程
-	git stash #暂存修改               
-	git stash list
-	git stash pop
-	git fetch --all  #1拉而不合
-	git reset --hard origin/master #2强制重置为远程库一样
+	#SVN没有的
+	git stash #暂存本地开发 本地还原为跟库一样,此时可以pull或切换分支改BUG
+	git stash list #列出暂存
+	git stash pop #弹出暂存 改完BUG回来,弹出暂存的开发
+	
 
 ##SSH--------------------------
 	ssh localhost --测试己安：

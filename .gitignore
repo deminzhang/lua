@@ -55,4 +55,9 @@ dkms.conf
 *.tlog
 *.stackdump
 .vs/
+*.enc
 
+
+/x64/Debug/*
+
+/include/mysql

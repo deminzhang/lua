@@ -1,0 +1,617 @@
+syntax="proto3";
+package protos;
+
+///////////////////////////////////////////////////////
+//18245 21536 GET 
+//20559 21332 POST
+//除主键req和数组rep,其它全部opt
+
+//服务器数据 仅上线时同步一次
+message Server {
+	int64 time = 3; 		//服务器时间
+	int32 appid = 4; 		//游戏ID
+	int32 region = 5; 		//游戏服ID
+	string chatUrl = 6; 	//聊天服地址
+	string version = 7; 	//后端版本标识
+}
+
+//角色信息(公)
+message User {
+	int64 uid = 1;			//UID
+	string name = 2;		//角色名
+	int32 gender = 3;		//性别
+	int32 icon = 4;		//头像
+	int32 iconB = 5;		//头像
+	int32 level = 6;		//级别
+	int32 cityX = 7;		//城坐标X
+	int32 cityY = 8;		//城坐标Y
+	int64 power = 10;		//战力
+	int64 allianceId = 11;	//联盟Id
+}
+message UserPK {
+	int64 uid = 1;			//UID
+}
+
+
+//日常限制(适合量大分组,统一重置)
+message UserLimit{
+	string group = 1;		// shop:商店 vipShop:VIP商店 mysticShop:神秘商店 mall:商城 mixed:杂项
+    string key = 2; 		// shop*:商品ID mall:商品ID mixed:约定
+    int32 num = 3; 		// 日用量
+}
+message UserLimitPK{
+	string group = 1;		// shop:商店 vipShop:VIP商店 mysticShop:神秘商店 mall:商城
+    string key = 2; 		// shop*:商品ID mall:商品ID
+}
+
+
+//角色计数(散杂又需时间计算)
+message UserCount {
+	int32 cid = 1;			//前后端约定
+	int64 val = 2;			//val
+	//Ticker
+	int64 time = 4;		//上次变化时间(0不变)
+	//int64 rest = 3;		//上次值
+	//float rate = 5;		//变化值(/ms,0不变)
+}
+message UserCountPK {
+	int32 cid = 1;			//
+}
+
+//角色前端标记
+message UserMark {
+	int32 cid = 1;			//前端自定义
+	int64 val = 2;			//val
+}
+message UserMarkPK {
+	int32 cid = 1;			//前端自定义
+}
+
+message IdNum {
+	int32 cid = 1;			//配置ID
+	int64 num = 2;			//数量
+}
+//道具
+message Item {
+	int64 sid = 1;			//主键
+	int32 cid = 2;			//配置ID
+	int64 num = 3;			//数量
+	int64 show = 4;		//显示至
+}
+message ItemPK {
+	int64 sid = 1;			//配置ID
+}
+message ItemArray {
+    repeated IdNum item = 1; 		//数组
+}
+
+//资源/计数
+message Res {
+	int32 cid = 1;			//配置ID
+	int64 num = 2;			//数量
+	int64 time = 3;		//上次变化时间(0不变)
+	float rate = 4;		//变化值(/ms,0不变)
+}
+message ResPK {
+	int32 cid = 1;			//配置ID
+}
+message ResArray {
+    repeated IdNum res = 1; 		//数组
+}
+
+//神秘商店商品
+message ShopGoods {
+	int32 cid = 1;			//配置ID
+	int32 num = 2;			//余量
+}
+message ShopGoodsPK {
+	int32 cid = 1;			//配置ID
+}
+
+//神秘商店刷新
+message ShopFlush {
+	int64 lastFlush = 1;		//上次刷新时间
+	int32 times = 2;			//手动刷新次数
+}
+
+
+//变化器
+message Ticker {
+	int64 rest = 1;		//上次值
+	int64 time = 2;		//上次变化时间(0不变)
+	float rate = 3;		//变化值(/ms,0不变)
+}
+
+//世界格子
+message Tile {
+	int32 x = 1;			//坐标X
+	int32 y = 2;			//坐标Y
+	int32 tp = 3;			//类型 TileConfig.id
+	int32 tp2 = 4;			//子类型 按各类型定义
+	int32 level = 5;		//级别 按各类型定义
+	
+	int64 uid = 6;			//所属玩家(缺省0无)
+	int64 allianceId = 7;	//所属联盟(缺省0无)
+	
+	repeated int64 troopId = 8;		//驻扎部队sid组
+	
+	Ticker durability = 9; //建筑耐久度(TODO)
+	Ticker resVal = 10;	//资源采集度
+	
+	//repeated int64 building = 11;		//建筑表现id组 TODO
+	//repeated int64 datas = 12;		//附加实例数据 TODO
+	
+}
+message TilePK {
+	int32 x = 1;			//X
+	int32 y = 2;			//Y
+}
+
+//兵种单元
+message Unit {
+    int32 cid = 1; 		// 配置ID
+    int32 num = 2; 		// 数量
+    int64 uid = 3; 		// 所属(可能联军有用)
+}
+message UnitPK {
+    int32 cid = 1; 		// 配置ID
+}
+message UnitArray {
+    repeated Unit unit = 1; 		//数组
+}
+
+//城建建筑
+message Building {
+	int64 sid = 1;			//主键(实例ID)
+	int32 tp = 2;			//类型(配表ID)
+	int32 level = 3;		//级别
+	
+	int64 uid = 6;			//所属玩家(弃x,对外缩略优化再议)
+	int32 pos = 7;			//位置索引(建造选位时前端提供,0:内城不需要索引)
+	//int32 stat = 8;		//状态(用再加)
+}
+message BuildingPK {
+	int64 sid = 1;			//主键
+}
+//领地区域解锁
+message CityArea {
+	int32 cid = 1;			//配置ID
+}
+
+//资源产出
+message ResOut {
+	int32 cid = 1;			//资源ID
+	int64 resTime = 2;		//上次结算时间
+	float resOut = 3;		//产量/s
+	int32 resVal = 4;		//已产出
+	int32 resMax = 5;		//容量上限
+}
+message ResOutPK {
+	int32 cid = 1;			//资源ID
+}
+
+//工作队列
+message Job{
+	int64 sid = 1;			//主键
+	int32 tp = 2;			//类(1建筑/升级 2拆建 3训兵 4升兵 5疗兵 6科技 7城防)
+	int64 stTime = 3;		//开始时间
+	int64 edTime = 4;		//结束时间
+	int64 bid = 5;			//指定建筑sid(限 建/升/拆)
+	int32 techId = 6;		//科技配置cid
+	int32 unitTp = 7;		//训/升兵配置cid(查询用冗余)
+	repeated Unit unit = 8;			//产品组(兵/疗(兵种,数量))
+	int64 sumTime = 9;		//初始总时间
+}
+message JobPK{
+	int64 sid = 1;			//主键
+}
+
+//英雄
+message Hero {
+    int64 sid = 1; 		// sid
+    int64 uid = 2; 		// uid
+    int32 cid = 3; 		// 表ID
+    int32 level = 4; 		// 等级
+    int32 exp = 5; 		// 经验
+    int32 step = 6; 		// 品阶
+    int32 stat = 7; 		// 状态0空闲1出征2重伤?
+}
+message HeroPK {
+    int64 sid = 1; 		// sid
+}
+//招募数据
+message Recruit{
+    int64 useTimesLow = 1; 	// 普通每日已用免费次数
+    int64 nextFreeTimeHigh = 2; // 高招下次免费时间
+    int32 timesHigh = 3; 		// 高招保底计数
+    int64 nextFreeTimeLow = 4; // 普招下次免费时间
+}
+
+//部队
+message Troop {
+	int64 sid = 1;			//主键
+	int64 uid = 2;			//所属玩家
+	int32 tp = 3;			//行动(1采,2侦,3驻,4集,5打怪,6打人,7联攻怪,8联攻人,9联防人)
+	int32 stat = 4;		//行动状态(1集结2出发3停留(驻采战)4返回)
+	int32 sx = 5;			//起点坐标
+	int32 sy = 6;			//起点坐标
+	int32 tx = 7;			//目标坐标
+	int32 ty = 8;			//目标坐标
+	int32 ttp = 9;			//目标类型 Tile.tp
+	int64 tval = 10;		//目标值 Tile.val
+	int64 lsid = 11;		//所属联军部队sid
+	int64 st = 12;			//出发时间(中途加速修正)
+	int64 et = 13;			//到达时间(0驻扎 中途加速修正)
+	int64 sumTime = 14;	//初始总时间
+	repeated int64 hero = 15;		//英雄sid(主将,副将,副将)
+	repeated Unit unit = 16;		//兵种数量
+	repeated Res res = 17;			//携带资源
+}
+message TroopPK {
+	int64 sid = 1;			//主键
+}
+
+//集结联军概要
+message Rally {
+	int64 sid = 1;			//主键 主部队sid
+	int64 uid = 2;			//发起者uid
+	int64 goTime = 3;		//集结截止时间
+	
+	int32 troopMax = 4;	//部队数上限
+	int32 troopNum = 5;	//当前部队数
+	int32 unitMax = 6;		//兵单位上限
+	int32 unitNum = 7;		//当前兵单位数
+}
+message RallyPK {
+	int64 sid = 1;			//主键
+}
+
+
+//科技
+message Tech {
+	int32 cid = 1;			//主键
+	int32 lv = 2;			//级别
+}
+message TechPK {
+	int32 cid = 1;			//主键
+}
+//Buff
+message Buff {
+	int32 cid = 1;			//主键
+	string src = 2;		//源 building,tech,item,vip,hero,...
+	float val = 3;			//值
+	int64 timeOut = 4;		//限时至 (无或0:无限时)
+}
+message BuffPK {
+	int32 cid = 1;			//主键
+	string src = 2;		//源
+}
+//Buff总结果(测试用)
+message BuffCalc {
+	int32 cid = 1;			//主键
+	float val = 3;			//值
+}
+message BuffCalcPK {
+	int32 cid = 1;			//主键
+}
+
+//邮件
+message Mail {
+    int64 sid = 1;			// 主键
+    int32 tp = 2; 			// 类型:1系统2玩家3侦查情报4战报5行动报告6联盟
+	int64 fromUid = 3; 	// 发送者玩家UID
+	string fromName = 4; 	// 发送者玩家名
+    int32 cid = 5;			// 邮件模板表ID
+	string title = 6; 		// 标题参数|分割
+	string content = 7; 	// 正文参数|分割
+    int64 time = 8;		// 发送时间
+    int64 timeOut = 9;		// 过期时间
+    int64 reportId = 10;	// 附件战报ID
+    int64 intelId = 11;	// 附件情报ID
+	repeated IdNum item = 12; 		// 附件道具组
+	repeated IdNum res = 13;		// 附件资源/计数组
+    bool read = 14;		// 己阅
+    bool take = 15;		// 己领(无附件默认false)
+    bool favor = 16;		// 已收藏(过期仍保留)
+	bool win = 17; 		// 战报使用是否胜利
+}
+message MailPK {
+    int64 sid = 1;	// ID
+}
+//邮件计数
+message MailNum {
+    int32 unread = 1; 		// 未读邮件数
+    int32 all = 2; 		// 邮件数
+}
+
+//task 主线支线任务
+message Task {
+    int64 tid = 1;			//主键 任务Id
+	int32 classify = 2;	//类别 主线1 支线2 每日3
+	int64 num = 3;			//当前完成数量
+	int32 tstate = 4;		//当前任务状态 0预备状态 1进行状态 2已完成 3已领取
+}
+//task 主线支线任务 主键
+message TaskPK {
+    int64 tid = 1;			//主键 任务Id
+	int32 classify = 2;	//类别 主线1 支线2 每日3
+}
+
+//ActicityReward 活跃度宝箱
+message ActicityReward {
+    int64 dbid = 1;		//主键 宝箱id - 对应表
+	int32 dbstate = 2;		//当前状态 0不可领取 1可领取 2已领取
+}
+
+message CombatRecordPK{
+	int64 sid = 1;						//序主键
+}
+
+//战报 兵种 英雄 箭塔 击杀内容
+message CombatUnitInfo{
+	int32 unitTp = 1;					//步骑弓车 999箭塔 998英雄
+	repeated Hero hero = 2;						//英雄
+	int32 killNum = 3;					//击败总数
+	int32 deadNum = 4;					//死亡数量
+	int32 woundedNum = 5;				//伤兵数量
+	int32 lifeNum = 6;					//存活数量
+	repeated Buff buff = 7;						//buff
+}
+
+
+//战报 详细内容
+message CombatInfoDetail{
+	string name = 1;					//玩家的名称
+	int32 x = 2;						//出发点的x坐标
+	int32 y = 3;						//出发点的y坐标
+	repeated Hero hero = 4;						//英雄
+	int32 power = 5;					//战斗力
+	int32 killNum = 7;					//击败总数
+	int32 deadNum = 8;					//死亡数量
+	int32 woundedNum = 9;				//伤兵数量
+	repeated CombatUnitInfo CombatUnitInfo =10;	//
+	int32 unitNum = 11;				//参战士兵数量
+	bool leader = 12;					//是否是队长
+}
+
+
+//战报 信息内容
+message CombatInfo{
+	string name = 1;					//玩家的名称
+	int32 x = 2;						//出发点的x坐标
+	int32 y = 3;						//出发点的y坐标
+	int32 maxAramyNum = 4;				//总兵数
+	int32 lossAramyNum = 5;			//损失兵数 
+	int32 lossPower = 7;				//损失战力
+	int32 deadNum = 8;					//死亡数量 (存活=总兵数-损失兵数)
+	int32 woundedNum = 9;				//伤兵数量
+	repeated CombatInfoDetail detail = 10;		//
+	int32 infantryNum = 11;			//步兵数量
+	int32 cavalryNum = 12;				//骑兵数量
+	int32 bowmenNum = 13;				//弓兵数量
+	int32 vehicledNum = 14;			//车兵数量
+	int32 infantryPower = 15;			//步兵战力
+	int32 cavalryPower = 16;			//骑兵战力
+	int32 bowmenPower = 17;			//弓兵战力
+	int32 vehicledPower = 18;			//车兵战力
+	int32 infantryDead = 19;			//步兵死亡数
+	int32 cavalryDead = 20;			//骑兵死亡数
+	int32 bowmenDead = 21;				//弓兵死亡数
+	int32 vehicledDead = 22;			//车兵死亡数
+	int32 infantryKill = 23;			//步兵击杀数
+	int32 cavalryKill = 24;			//骑兵击杀数
+	int32 bowmenKill = 25;				//弓兵击杀数
+	int32 vehicledKill = 26;			//车兵击杀数 
+}
+//战报 头部内容
+message CombatRecord{
+	int64 sid = 1;						//序主键
+	string combatId = 2;				//战斗id 用于播放战斗回放
+	int64 userId = 3;					//userId
+	CombatInfo atk = 4;				//攻击方
+	CombatInfo def = 5;				//防守方
+	int64 time = 6;					//发生的时间点(毫秒)
+	repeated IdNum item = 7; 					//获得道具
+	repeated IdNum res = 8; 					//获得资源
+	int32 exp = 9; 					//获得经验
+	bool win = 10; 					//是否胜利
+	bool myDef = 11;					//是否是防守方
+	int32 x = 12;						//战斗发生的x坐标
+	int32 y = 13;						//战斗发生的y坐标
+}
+
+
+//alliance 联盟
+message Alliance {
+    int64 sid = 1;							//主键 联盟Id
+	string name = 2;						//联盟名字
+	string flag = 3;						//旗帜
+	string allianceManifesto = 4;			//宣言
+	string allianceMinName = 5;			//缩写
+	string language = 6;					//语言
+	int32 autoPermit = 7;					//招募状态
+	int32 level = 8;						//级别
+	int32 onlineNum = 9;					//在线人数
+	bool leaderOnline = 10;				//帮主是否在线
+	int64 allianceCombatPower = 11;		//联盟战斗力
+	repeated int32 allianceXY = 12;					//联盟坐标
+	string leaderName = 13;				//盟主名字
+	int32 currNum = 14;					//当前数量
+	int32 maxNum = 15;						//最大数量
+}
+message AlliancePK {
+    int64 sid = 1;							//主键 联盟Id
+}
+
+
+// 联盟成员列表
+message AllianceMember {
+    int64 uid = 1;							//角色UID
+	string name = 2;						//角色名字
+	int32 level = 3;						//级别
+	int32 post = 4;						//职位(1盟主2副主3官员4成员5见习)
+	int64 power = 5;						//战力
+	int32 contribution = 6;				//贡献
+	int32 cityX = 7;						//主城坐标X
+	int32 cityY = 8;						//主城坐标Y
+	int64 loginTime = 9;					//上次在线时间
+	int64 joinTime = 10;					//入盟时间
+	int64 forbiddenWords = 11;				//禁言至时间
+	int32 icon = 12;						//头像
+}
+message AllianceMemberPK {
+    int64 uid = 1;							//角色UID
+}
+
+
+// 联盟被申请列表
+message AllianceApply {
+	int64 uid = 1;							//申请人角色UID
+	string name = 2;						//申请人角色名
+    int32 icon  = 3;						//头像
+    int32 level  = 4;						//级别
+    int64 power  = 5;						//战力
+	int64 time = 6;						//时间
+}
+message AllianceApplyPK {
+	int64 uid = 1;							//主键
+}
+
+// 我发出的申请列表(联盟列表用)
+message UserAllianceApply {
+	int64 sid = 3;							//申请联盟ID
+}
+message UserAllianceApplyPK {
+	int64 sid = 1;							//主键
+}
+
+// 联盟科技
+message AllianceTech {
+    int64 cid = 1;							//配置ID
+    int32 level = 2;						//级别
+    int32 exp = 3;							//经验进度
+    bool recommend = 4;					//推荐
+    int64 upTime = 5;						//升级完成时间(-1未在升级中)
+}
+message AllianceTechPK {
+    int64 cid = 1;							//
+}
+
+
+// 联盟帮助列表
+message AllianceHelp {
+    int64 sid = 1;					//等于求助者队列ID
+    int64 uid = 2;					//求助者角色UID
+    int32 tp = 3;					//同Job(1建筑/升级 5疗兵 6科技)
+    int32 cid = 4;					//Job配置id
+    int32 toLevel = 5;				//队列目标级别
+    int32 times = 6;				//己帮次数
+    int32 maxTimes = 7;			//最大可帮次数
+}
+message AllianceHelpPK {
+    int64 sid = 1;							//sid
+}
+
+// 联盟动态
+message AllianceLog {
+    int64 sid = 1;							//角色UID
+    int64 cid = 2;							//类型
+    int64 time = 3;						//时间
+    string detail = 4;						//参数组 逗号分切 前端多语言拼
+}
+message AllianceLogPK {
+    int64 sid = 1;							//
+}
+
+
+//更新
+message Updates {
+	Server server = 1;		//服务器数据
+	User user = 2;			//角色数据
+	repeated Item item = 3;			//道具
+	repeated Hero hero = 4;			//英雄
+	repeated Mail mail = 5;			//邮件(上线不带)
+	repeated MailNum mailNum = 6;	//邮件计数(上线带)
+	repeated Troop troop = 7;		//部队
+	repeated Tile tile = 8;			//格子
+	repeated User other = 9;		//其它角色数据
+	repeated Res res = 10;			//资源/计数
+	repeated Building building = 11;//建筑
+	repeated Unit unit = 12;		//兵种
+	repeated Unit wounded = 13;		//伤兵
+	repeated Job job = 14;			//工作队列
+	repeated Task task = 15;		//主线和支线任务
+	repeated Tech tech = 16;		//科技
+	repeated Buff buff = 17;		//buff
+	repeated ActicityReward box = 18;	//日常宝箱
+	repeated Alliance alliance = 19;	//联盟信息
+	repeated ResOut resOut = 20;		//资源产出
+	repeated Recruit recruit = 21; 	//英雄招募数据
+	//repeated IdNum recruitResult = 22; 	//英雄招募结果(以道具方式)
+	repeated Rally rally = 22;		//联军
+	repeated UserLimit userLimit = 23;		//日常计限量
+	repeated CombatRecord combatRecord = 24;	//战报
+	repeated ShopFlush mysteryShopFlush = 25;		//神秘商店刷新数据
+	repeated ShopGoods mysteryShopGoods = 26;		//神秘商店商品数据
+	repeated AllianceMember allianceMember = 27;		//联盟成员
+	repeated AllianceApply allianceApply = 28;				//联盟申请
+	repeated UserAllianceApply userAllianceApply = 29;		//我发出的申请列表
+	repeated AllianceLog allianceLog = 30;		//联盟日志
+	repeated AllianceHelp allianceHelp = 31;		//联盟帮助
+	repeated UserCount userCount = 32;		//个人统计
+	repeated UserMark userMark = 33;		//前端记录
+	repeated AllianceTech allianceTech = 34;	//联盟科技
+	repeated BuffCalc buffCalc = 36;	//buff总值
+	repeated CityArea cityArea = 37;	//领地区域解锁
+}
+//删除(主键)
+message Removes {
+	repeated ItemPK item = 1;		//道具
+	repeated HeroPK hero = 2;		//英雄
+	repeated MailPK mail = 3;		//邮件
+	repeated TroopPK troop = 4;		//部队
+	repeated TilePK tile = 5;		//格子
+	repeated ResPK res = 6;			//资源/计数
+	repeated BuildingPK building = 7;//建筑
+	repeated UnitPK unit = 8;		//兵种
+	repeated UnitPK wounded = 9;	//伤兵
+	repeated JobPK job = 10;		//工作队列
+	repeated TechPK tech = 11;		//科技
+	repeated BuffPK buff = 12;		//buff
+	repeated TaskPK task = 13;		//任务
+	repeated RallyPK rally = 14;	//联军概要
+	repeated UserLimitPK userLimit = 23;		//日常计限量
+	repeated CombatRecordPK combatRecord = 24;	//战报
+	repeated ShopGoodsPK mysteryShopGoods = 26;		//神秘商店商品数据
+	repeated AllianceMemberPK allianceMember = 27;		//联盟成员
+	repeated AllianceApplyPK allianceApply = 28;				//联盟申请
+	repeated UserAllianceApplyPK userAllianceApply = 29;		//我发出的申请列表
+	repeated AllianceLogPK allianceLog = 30;		//联盟日志
+	repeated AllianceHelpPK allianceHelp = 31;		//联盟帮助
+	repeated UserCountPK userCount = 32;		//个人统计
+	repeated UserMarkPK userMark = 33;		//前端记录
+	repeated BuffCalcPK buffCalc = 36;	//buff总值(测试用)
+}
+
+//*_C+1通用回应
+//12主动推送
+message Response_S {
+	Updates updates = 2;	//全量更新 主键必带 rep变空数据必用
+	Removes removes = 3;	//删除,必须只有主键
+	Updates props = 4;		//增量更新 主键必带,opt只发变动的,rep变不可用
+}
+//14通用错误
+message Error_S {
+    int32 code = 2;        // 正常返回为0, 否则为错误代码
+    string msg = 3;       	// 错误信息
+	repeated string params = 4;		// 错误参数,由错误号决定
+}
+
+//---------------------------------------------------
+
+//1
+message Ping {
+}
+//2
+message Pong {
+}

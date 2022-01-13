@@ -389,7 +389,7 @@ int main(int argc, char *argv[], char *envs[])
 	else
 		fprintf(stderr, "%s\n", lua_tostring(L, -1));
 
-	usleep(60000);
+	usleep(10000);
 	lua_close(L);
 	usleep(60000);
 	return 0;

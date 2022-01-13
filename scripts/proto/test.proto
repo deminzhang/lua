@@ -1,0 +1,50 @@
+syntax="proto3";
+package protos;
+
+
+enum TestEnum{
+	MONDAY = 0;
+	SUNDAY = 1;
+}
+
+message TestType{
+	int32 Fint32  = 1; //注释 default
+	int64 Fint64  = 2;
+	uint32 Fuint32  = 3;
+	uint64 Fuint64  = 4;
+	sint32 Fsint32  = 5;
+	sint64 Fsint64  = 6;
+	fixed32 Ffixed32  = 7;
+	fixed64 Ffixed64  = 8;
+	double Fdouble  = 9;
+	float Ffloat  = 10;
+	bool Fbool  = 11;
+	TestEnum Fenum = 12;
+	map<int64,int32> Fmap = 14;
+	repeated bool Frepeatbool = 15;
+	string Fstring = 16;
+	bytes Fbytes = 17;
+	sfixed32 Fsfixed32 = 18;
+	sfixed64 Fsfixed64 = 19;
+	repeated int32 Frepeatint = 20;
+	repeated bool Frepeatbool2 = 21;
+	repeated int32 Frepeatint2 = 22;
+	repeated string Fstring2 = 23;
+	message TestChild{
+		sint64 fsint64 = 1;
+	}
+	TestChild Fmessage = 24;
+	repeated TestChild Frepc = 25;
+	TestChild Fzzz = 26;
+	message TTT{
+		sint64 fsint64 = 1;
+		message TT2{
+			sint64 Fsint64 = 1;
+		}
+		TT2 Fzzz = 2;
+	}
+	TTT Fzzz = 27;
+}
+message TTT{
+	sint64 fsint64 = 1;
+}

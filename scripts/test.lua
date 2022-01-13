@@ -202,10 +202,6 @@ if test[os.info.type] then
 	test[os.info.type]()
 end
 
-
-
-
-
 function _mainloop()
 do return end
 	local reg = debug.getregistry()
@@ -242,7 +238,7 @@ do return end
 end
 
 
-do return end
+-- do return end
 --lua题
 --debug.getupvalue 热更代码debug
 --元表__eq 表内相等
@@ -260,3 +256,121 @@ do return end
 --用索引代码elseif
 --and or 二元操作
 --表创建优化,尽量整体
+
+debug.gc()
+collectgarbage('collect')
+collectgarbage('collect')
+collectgarbage('collect')
+collectgarbage('collect')
+local TIMES = 1000000
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t1 = {}
+	-- for j=1,128 do
+		-- t1[j] = 1
+	-- end
+-- end
+-- print(os.clock()-t) --1.29599999999999982
+-- collectgarbage('collect')
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t1 = {1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,}
+	-- for j=1,128 do
+		-- t1[j] = 1
+	-- end
+-- end
+-- print(os.clock()-t) --0.663000000000000256
+-- collectgarbage('collect')
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t1 = {false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,}
+	-- for j=1,128 do
+		-- t1[j] = 1
+	-- end
+-- end
+-- print(os.clock()-t) --0.663000000000000256
+-- collectgarbage('collect')
+-- local newtab = table.new
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t1 = newtab(128,0)
+	-- for j=1,128 do
+		-- t1[j] = 1
+	-- end
+-- end
+-- print(os.clock()-t) --0.729999999999999538
+-- collectgarbage('collect')
+
+-- local t1 = {1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,1,2,2,3,}
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = {}
+	-- for i,v in pairs(t1) do --普通复制
+		-- t2[i] = v
+	-- end
+-- end
+-- print(os.clock()-t) --2.31700000000000017
+-- collectgarbage('collect')
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = table.new(128,0) --已知容量
+	-- for i,v in pairs(t1) do
+		-- t2[i] = v
+	-- end
+-- end
+-- print(os.clock()-t) --1.46000000000000085
+-- collectgarbage('collect')
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = table.new(table.size(t1)) --取得容量
+	-- for i,v in pairs(t1) do
+		-- t2[i] = v
+	-- end
+-- end
+-- print(os.clock()-t) --1.49799999999999933
+
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = table.duplicate(t1) --C层浅复制jit
+-- end
+-- print(os.clock()-t) --0.704000000000000625
+-- collectgarbage('collect')
+
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = {}
+	-- for i,v in pairs(t1) do --普通复制
+		-- t2[i] = v
+	-- end
+-- end
+-- print(os.clock()-t) --2.31700000000000017  非jit 7.774
+-- collectgarbage('collect')
+-- local func = table.template(t1)
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- local t2 = func() --逆向模板
+-- end
+-- print(os.clock()-t) --0.000900000000000011 非jit 2.906
+-- collectgarbage('collect')
+-- local t = os.clock()
+-- for i=1,TIMES do
+	-- for i,v in pairs(t1) do
+	-- end
+-- end
+-- print(os.clock()-t) --0.459000000000001407
+-- collectgarbage('collect')
+
+local obj = {}
+function TestLeak()
+	print(obj)
+end
+local refs = debug.findobj( _G, function(o)return o==obj end, '_G' )
+dump(refs)
+local refs = debug.findobj( debug.getregistry(), function(o)return o==obj end, '_REG') 
+dump(refs)
+
+
+error('teststop')
+
+
+
